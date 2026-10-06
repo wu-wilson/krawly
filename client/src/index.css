@@ -1,6 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,29 +5,36 @@
 :root {
   /* Stored as space-separated RGB channels (hex in comments) and consumed via
      `rgb(var(--token) / <alpha-value>)` in tailwind.config.js, so opacity modifiers
-     like `ring-brand/50` resolve correctly. */
-  --brand: 212 160 23;           /* #d4a017 */
-  --brand-light: 229 184 54;     /* #e5b836 */
-  --brand-dark: 184 134 11;      /* #b8860b */
-  --brand-subtle: rgba(212, 160, 23, 0.08); /* pre-baked alpha; used without a modifier */
+     like `bg-accent/10` resolve correctly. The map's canvas colors are mirrored as hex in `render/colors.ts`. */
+  --ground: 246 247 249;         /* #F6F7F9 page */
+  --surface: 255 255 255;        /* #FFFFFF windows, panels, fields */
+  --canvas: 251 251 252;         /* #FBFBFC map backdrop */
 
-  --bg-primary: 17 17 20;        /* #111114 */
-  --bg-secondary: 26 26 30;      /* #1a1a1e */
-  --bg-tertiary: 35 35 40;       /* #232328 */
+  --ink: 11 13 18;               /* #0B0D12 */
+  --ink-hover: 42 47 59;         /* #2A2F3B primary button hover */
+  --ink-2: 69 76 89;             /* #454C59 */
+  --ink-3: 104 113 130;          /* #687182 */
+  --ink-4: 127 136 153;          /* #7F8899 second line of two-tone headings */
 
-  --border-color: 46 46 52;      /* #2e2e34 */
-  --border-subtle: 35 35 40;     /* #232328 */
+  --line: 228 231 236;           /* #E4E7EC */
+  --line-soft: 240 242 245;      /* #F0F2F5 */
+  --line-strong: 207 212 220;    /* #CFD4DC */
 
-  --text-primary: 236 236 238;   /* #ececee */
-  --text-secondary: 139 139 150; /* #8b8b96 */
-  --text-tertiary: 92 92 102;    /* #5c5c66 */
+  --wash-row: 247 248 250;       /* #F7F8FA row hover */
+  --wash-well: 244 245 247;      /* #F4F5F7 search field */
+  --wash-hover: 243 244 246;     /* #F3F4F6 ghost button hover */
+  --wash-track: 241 243 245;     /* #F1F3F5 segmented control track */
 
-  --surface-hover: 35 35 40;     /* #232328 */
+  --accent: 91 79 214;           /* #5B4FD6 focus, selection, fetching */
+  --broken: 207 58 29;           /* #CF3A1D */
+  --redirect: 46 102 230;        /* #2E66E6 */
 
-  --status-healthy: 52 211 153;  /* #34d399 */
-  --status-redirect: 52 211 153; /* #34d399 */
-  --status-broken: 248 113 113;  /* #f87171 */
-  --status-pending: 212 160 23;  /* #d4a017 */
+  --graph-grid: 221 225 231;     /* #DDE1E7 map dot grid */
+
+  --silk-1: 217 221 227;         /* #D9DDE3 light silver */
+  --silk-2: 140 148 161;         /* #8C94A1 */
+  --silk-3: 42 47 59;            /* #2A2F3B */
+  --silk-4: 11 13 18;            /* #0B0D12, the ink */
 }
 
 /* Base styles */
@@ -41,123 +45,77 @@
   }
 
   body {
-    @apply bg-bg-primary text-text-primary font-sans antialiased overscroll-none;
+    @apply bg-ground text-ink font-sans antialiased overscroll-none;
   }
 }
 
 /* Scrollbar hide utility */
 .scrollbar-hide {
-  -ms-overflow-style: none;
   scrollbar-width: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
 
-/* Landing page entrance — fade + small slide from the corresponding direction */
-@keyframes landing-from-left {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: translateX(0); }
+/* Loading line: the silk gradient sweeping along the bottom of the top bar while a crawl runs. A component, so utilities
+   such as the paused play state can override it. */
+@layer components {
+  .loader-sweep {
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--silk-1)),
+      rgb(var(--silk-2)) 30%,
+      rgb(var(--silk-3)) 60%,
+      rgb(var(--silk-4)) 85%,
+      rgb(var(--silk-1))
+    );
+    background-size: 1200px 100%;
+    background-repeat: repeat-x;
+    animation: loader-sweep 2.4s linear infinite;
+  }
 }
 
-@keyframes landing-from-bottom {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes loader-sweep {
+  from { background-position: 0 0; }
+  to { background-position: 1200px 0; }
 }
 
-.animate-landing-from-left {
-  opacity: 0;
-  animation: landing-from-left 1000ms ease forwards;
+/* Landing silk. Below 1132px each half fades out as it nears the demo window, so thread ends never show as
+   fragments in the narrow margins beside it. On phones the whole thing is drawn at 60%. */
+@media (max-width: 1131.98px) {
+  .silk-upper {
+    -webkit-mask-image: linear-gradient(to bottom, #000 280px, transparent 340px);
+    mask-image: linear-gradient(to bottom, #000 280px, transparent 340px);
+  }
+  .silk-lower {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 400px, #000 460px);
+    mask-image: linear-gradient(to bottom, transparent 400px, #000 460px);
+  }
 }
 
-.animate-landing-from-bottom {
-  opacity: 0;
-  animation: landing-from-bottom 1000ms ease forwards;
+@media (max-width: 639.98px) {
+  .silk-upper {
+    transform: scale(0.6);
+    transform-origin: calc(100% - 320px) 340px;
+  }
+  .silk-lower {
+    transform: scale(0.6);
+    transform-origin: 320px 400px;
+  }
 }
-
-/* Fade in */
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.animate-fade-in {
-  animation: fade-in 600ms ease forwards;
-}
-
-/* Spider logo animations */
-@keyframes leg-wave {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(3deg); }
-}
-
-@keyframes leg-wave-reverse {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(-3deg); }
-}
-
-@keyframes crawl-cycle {
-  0% { transform: rotate(0deg); }
-  25% { transform: rotate(8deg); }
-  50% { transform: rotate(0deg); }
-  75% { transform: rotate(-8deg); }
-  100% { transform: rotate(0deg); }
-}
-
-.spider-logo .spider-leg {
-  transform-origin: center;
-}
-
-.spider-logo .leg-1, .spider-logo .leg-3, .spider-logo .leg-5 {
-  animation: leg-wave 3s ease-in-out infinite;
-}
-
-.spider-logo .leg-2, .spider-logo .leg-4, .spider-logo .leg-6 {
-  animation: leg-wave-reverse 3s ease-in-out infinite;
-  animation-delay: 0.3s;
-}
-
-.spider-logo.crawling .spider-leg {
-  animation-duration: 0.4s !important;
-}
-
-.spider-logo.crawling .leg-1, .spider-logo.crawling .leg-3,
-.spider-logo.crawling .leg-5 {
-  animation-name: crawl-cycle;
-}
-
-.spider-logo.crawling .leg-2, .spider-logo.crawling .leg-4,
-.spider-logo.crawling .leg-6 {
-  animation-name: crawl-cycle;
-  animation-delay: 0.1s;
-}
-
-/* Suppress CSS leg animations during the JS-driven landing-page entrance so WAAPI is the
-   sole driver — prevents a transform "snap" when the WAAPI effect is canceled at the end. */
-.spider-logo.js-legs .spider-leg {
-  animation: none !important;
-}
-
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .spider-logo .spider-leg {
-    animation: none !important;
+  html {
+    scroll-behavior: auto;
   }
 
-  .animate-landing-from-left,
-  .animate-landing-from-bottom {
+  .loader-sweep,
+  .animate-menu-in {
     animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  .animate-fade-in {
-    animation: none !important;
-    opacity: 1 !important;
   }
 
   * {
-    transition-duration: 100ms !important;
+    transition-duration: 0ms !important;
   }
 }

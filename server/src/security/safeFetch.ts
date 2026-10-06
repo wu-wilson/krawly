@@ -1,41 +1,77 @@
-import { TIMEOUT_MS, MAX_BODY_SIZE, USER_AGENT, MAX_REDIRECTS } from '../constants';
+import { Agent, fetch } from 'undici';
 
-import { assertSafeUrl, BlockedUrlError } from './urlGuard';
+import { REQUEST_TIMEOUT_MS, MAX_BODY_SIZE_BYTES, USER_AGENT, MAX_REDIRECTS } from '../constants';
+import { assertSafeUrl, BlockedUrlError, guardedLookup } from './urlGuard';
 
-/** Unified response shape returned to both /fetch and /head handlers. */
-interface ProxyFetchResult {
+import type { Response } from 'undici';
+
+/** One redirect followed on the way to the final response */
+interface RedirectHop {
+  /** URL that answered with the redirect */
+  url: string;
+  /** Its 3xx status code */
   status: number;
+}
+
+/** What `/fetch` and `/head` respond with */
+export interface ProxyFetchResult {
+  /** Final HTTP status, or 0 when no response was received */
+  status: number;
+  /** Final response headers */
   headers: Record<string, string>;
+  /** Time across every hop, in ms */
   responseTime: number;
+  /** Decoded body of a 2xx HTML page, capped at MAX_BODY_SIZE_BYTES; null for everything else */
   body: string | null;
+  /** URL that gave the final response, or null on failure */
   finalUrl: string | null;
+  /** Redirects followed before the final response, in order */
+  redirects: RedirectHop[];
+  /** Why no response was received */
   error?: string;
 }
 
-interface ProxyFetchOptions {
-  /** When true, sends HEAD and skips the response body entirely. */
+/** How `proxyFetch` makes its request */
+export interface ProxyFetchOptions {
+  /** Check status only, without reading the body */
   headOnly: boolean;
+  /** Abandons the request early, such as when the client goes away */
+  signal?: AbortSignal;
 }
 
 const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
 
-/**
- * Fetch a URL through the proxy with the SSRF guard applied at every hop.
- * Follows up to MAX_REDIRECTS manually, re-validating each Location target.
- * @param rawUrl - URL to fetch (will be validated before any network I/O)
- * @param options - headOnly toggles HEAD vs GET and suppresses body reads
- * @returns Final response, or an error result with status 0 on any failure
- */
-export const proxyFetch = async (
-  rawUrl: string,
-  { headOnly }: ProxyFetchOptions
-): Promise<ProxyFetchResult> => {
-  const start = Date.now();
+// Servers that don't implement HEAD answer with these; such URLs are checked with a GET instead.
+const HEAD_UNSUPPORTED = new Set([405, 501]);
 
-  // One AbortController across all hops so an attacker can't drain the
-  // timeout by chaining redirects.
+// Every outbound socket resolves through the guard, so the address checked is the address dialed.
+const dispatcher = new Agent({ connect: { lookup: guardedLookup } });
+
+/**
+ * Fetch a URL with the SSRF guard applied at every hop, following up to MAX_REDIRECTS manually.
+ * @param rawUrl - URL to fetch
+ * @param options - Whether to skip the body, and a signal to abandon the request
+ * @returns The final response, or a result with status 0 and an error when no response was received
+ */
+export const proxyFetch = async (rawUrl: string, { headOnly, signal }: ProxyFetchOptions): Promise<ProxyFetchResult> => {
+  const start = Date.now();
+  const redirects: RedirectHop[] = [];
+
+  // One timeout across all hops, so chained redirects can't extend it.
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const abandon = () => controller.abort();
+  if (signal?.aborted) abandon();
+  signal?.addEventListener('abort', abandon);
+
+  const request = (url: URL, method: 'GET' | 'HEAD'): Promise<Response> =>
+    fetch(url, {
+      method,
+      headers: { 'User-Agent': USER_AGENT },
+      signal: controller.signal,
+      redirect: 'manual',
+      dispatcher,
+    });
 
   const errorResult = (message: string): ProxyFetchResult => ({
     status: 0,
@@ -43,99 +79,132 @@ export const proxyFetch = async (
     responseTime: Date.now() - start,
     body: null,
     finalUrl: null,
+    redirects,
     error: message,
   });
 
   try {
-    let currentUrl = rawUrl;
+    let current = assertSafeUrl(rawUrl);
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      let safe: URL;
-      try {
-        safe = await assertSafeUrl(currentUrl);
-      } catch (err) {
-        if (err instanceof BlockedUrlError) {
-          return errorResult(err.message);
-        }
-        throw err;
+      let response = await request(current, headOnly ? 'HEAD' : 'GET');
+      if (headOnly && HEAD_UNSUPPORTED.has(response.status)) {
+        await discardBody(response);
+        response = await request(current, 'GET');
       }
-
-      const response = await fetch(safe.toString(), {
-        method: headOnly ? 'HEAD' : 'GET',
-        headers: { 'User-Agent': USER_AGENT },
-        signal: controller.signal,
-        redirect: 'manual',
-      });
 
       const location = response.headers.get('location');
       if (REDIRECT_CODES.has(response.status) && location) {
-        if (hop >= MAX_REDIRECTS) {
-          return errorResult('Too many redirects');
-        }
-        let next: URL;
-        try {
-          next = new URL(location, safe);
-        } catch {
-          return errorResult('Invalid redirect target');
-        }
-        currentUrl = next.toString();
+        await discardBody(response);
+        redirects.push({ url: current.toString(), status: response.status });
+        // Past the last allowed hop, where the redirect points no longer matters.
+        if (hop === MAX_REDIRECTS) break;
+        const next = new URL(location, current);
+        if (next.protocol !== 'http:' && next.protocol !== 'https:') return errorResult('Invalid redirect target');
+        current = assertSafeUrl(next.toString());
         continue;
       }
 
+      // Repeated headers such as Set-Cookie are joined rather than letting the last one win.
       const headers: Record<string, string> = {};
       response.headers.forEach((value, key) => {
-        headers[key] = value;
+        headers[key] = headers[key] ? `${headers[key]}, ${value}` : value;
       });
 
-      const body = headOnly ? null : await readCappedBody(response);
+      // Only a successful HTML page's body is returned, since that's all the crawler reads for links; an error page's
+      // body could only slow the reply down.
+      const html = (headers['content-type'] ?? '').toLowerCase().includes('text/html');
+      let body: string | null = null;
+      if (headOnly || !response.ok || !html) await discardBody(response);
+      else body = await readCappedBody(response);
 
       return {
         status: response.status,
         headers,
         responseTime: Date.now() - start,
         body,
-        finalUrl: safe.toString(),
+        finalUrl: current.toString(),
+        redirects,
       };
     }
 
     return errorResult('Too many redirects');
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return errorResult(message);
+    return errorResult(describeError(err));
   } finally {
     clearTimeout(timeout);
+    signal?.removeEventListener('abort', abandon);
   }
 };
 
 /**
- * Stream the response body into a single decoded string, stopping once the
- * accumulated byte count crosses MAX_BODY_SIZE. The abort signal on the
- * underlying fetch stays armed, so a hung body read still trips the timeout.
+ * Turn a thrown error into the message reported to the client, unwrapping fetch's generic "fetch failed".
+ * @param err - Thrown value
+ * @returns Error message
+ */
+const describeError = (err: unknown): string => {
+  const wrapped = err instanceof Error && err.cause instanceof Error ? err.cause : err;
+  // When every address for a host fails, Node reports one AggregateError with an empty message; use the first.
+  const cause = wrapped instanceof AggregateError && wrapped.errors[0] instanceof Error ? wrapped.errors[0] : wrapped;
+  if (cause instanceof BlockedUrlError) return cause.message;
+  // A host that doesn't exist is told apart from a lookup that failed for now, so a resolver hiccup isn't
+  // reported as a missing site.
+  if (cause instanceof Error && 'code' in cause && cause.code === 'ENOTFOUND') return 'Hostname could not be resolved';
+  if (cause instanceof Error && 'code' in cause && cause.code === 'EAI_AGAIN') return 'Hostname lookup failed';
+  if (cause instanceof Error && cause.name === 'AbortError') return 'Request timed out';
+  if (err instanceof TypeError && err.message === 'Invalid URL') return 'Invalid redirect target';
+  return cause instanceof Error ? cause.message : 'Unknown error';
+};
+
+/**
+ * Release a response's connection without reading its body.
+ * @param response - Response to discard
+ */
+const discardBody = async (response: Response): Promise<void> => {
+  // Cancelling a body that already closed or errored has nothing left to release.
+  await response.body?.cancel().catch(() => {});
+};
+
+/**
+ * Read a body, stopping at MAX_BODY_SIZE_BYTES, and decode it with the charset its Content-Type declares (UTF-8
+ * otherwise), so links on a page in a legacy encoding resolve as a browser would. The request's abort signal stays
+ * armed, so a stalled read still hits the timeout.
+ * @param response - Response to read
+ * @returns Decoded body
  */
 const readCappedBody = async (response: Response): Promise<string> => {
   const reader = response.body?.getReader();
   if (!reader) return '';
 
   const chunks: Uint8Array[] = [];
-  let totalSize = 0;
-
+  let size = 0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    totalSize += value.byteLength;
-    if (totalSize > MAX_BODY_SIZE) {
-      reader.cancel();
+    const room = MAX_BODY_SIZE_BYTES - size;
+    if (value.byteLength >= room) {
+      chunks.push(value.subarray(0, room));
+      // The capped bytes are already read; a failed cancel leaves nothing to release.
+      await reader.cancel().catch(() => {});
       break;
     }
     chunks.push(value);
+    size += value.byteLength;
   }
 
-  return new TextDecoder().decode(
-    chunks.reduce((acc, chunk) => {
-      const merged = new Uint8Array(acc.length + chunk.length);
-      merged.set(acc);
-      merged.set(chunk, acc.length);
-      return merged;
-    }, new Uint8Array(0))
-  );
+  return decoderFor(response.headers.get('content-type')).decode(Buffer.concat(chunks));
+};
+
+/**
+ * Pick a decoder for the charset a Content-Type header declares, reading a missing or unknown one as UTF-8.
+ * @param contentType - The response's Content-Type header
+ * @returns Text decoder
+ */
+const decoderFor = (contentType: string | null) => {
+  const charset = /charset="?([\w-]+)/i.exec(contentType ?? '')?.[1];
+  try {
+    return new TextDecoder(charset ?? 'utf-8');
+  } catch {
+    return new TextDecoder();
+  }
 };

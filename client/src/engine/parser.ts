@@ -2,127 +2,128 @@ import { normalizeUrl } from './urlUtils';
 
 import type { ResourceType } from './types';
 
+/** A link found on a page */
 interface ParsedLink {
-  /** Normalized URL */
-  url: string;
+  /** Absolute URL as linked, without its fragment; used for requests */
+  href: string;
+  /** Normalized URL, used for deduplication */
+  id: string;
   /** HTML element that contained the link */
   element: string;
   /** Classified resource type */
   resourceType: ResourceType;
 }
 
+const PRELOAD_TYPES: Record<string, ResourceType> = {
+  script: 'script',
+  style: 'stylesheet',
+  image: 'image',
+  font: 'font',
+};
+
 /**
- * Extract all URLs from an HTML document
+ * Classify a `<link>` by its rel. Only rels that name a resource the page loads are kept; resource hints
+ * (preconnect, dns-prefetch), feeds, and endpoints like pingback point at origins or APIs that aren't meant
+ * to be fetched on their own, so checking them would report false errors.
+ * @param rel - The link's rel attribute
+ * @param as - The link's as attribute, for preloads
+ * @returns Resource type, or null to skip the link
+ */
+const classifyLinkRel = (rel: string, as: string): ResourceType | null => {
+  const rels = rel.toLowerCase().split(/\s+/);
+  if (rels.includes('stylesheet')) return 'stylesheet';
+  if (rels.some((r) => r === 'icon' || r === 'apple-touch-icon' || r === 'mask-icon')) return 'image';
+  if (rels.includes('modulepreload')) return 'script';
+  if (rels.includes('preload')) return PRELOAD_TYPES[as.toLowerCase()] ?? 'other';
+  if (rels.includes('manifest')) return 'other';
+  return null;
+};
+
+/**
+ * Read the image URLs from a srcset. As in browsers, a URL runs to the next space (so it can contain commas),
+ * and its size descriptor runs to the next comma.
+ * @param srcset - The srcset attribute
+ * @returns Candidate URLs in order
+ */
+const srcsetUrls = (srcset: string): string[] =>
+  Array.from(srcset.matchAll(/[\s,]*([^\s,]\S*?)(?:,+(?=\s|$)|\s[^,]*|$)/g), (match) => match[1]);
+
+/**
+ * Extract every http(s) URL an HTML document links to or loads, once each.
  * @param html - Raw HTML string
- * @param baseUrl - Base URL for resolving relative links
- * @returns Array of parsed link objects with deduplicated URLs
+ * @param baseUrl - URL the document was served from, for resolving relative links
+ * @returns Links grouped by element type (anchors first), in document order within each group, deduplicated by normalized URL
  */
 export const parseLinks = (html: string, baseUrl: string): ParsedLink[] => {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // Relative links resolve against the page's <base href> when it declares one.
+  const declaredBase = doc.querySelector('base[href]')?.getAttribute('href');
+  let base = baseUrl;
+  try {
+    if (declaredBase) base = new URL(declaredBase, baseUrl).href;
+  } catch {
+    // An unusable <base> is ignored, as browsers do.
+  }
   const seen = new Set<string>();
   const links: ParsedLink[] = [];
 
   const add = (rawUrl: string | null | undefined, element: string, resourceType: ResourceType) => {
-    if (!rawUrl) return;
-    const trimmed = rawUrl.trim();
-    if (!trimmed) return;
+    const trimmed = rawUrl?.trim();
+    // Fragment-only links point back at the same page.
+    if (!trimmed || trimmed.startsWith('#')) return;
 
-    // Skip non-HTTP schemes
-    if (
-      trimmed.startsWith('javascript:') ||
-      trimmed.startsWith('mailto:') ||
-      trimmed.startsWith('tel:') ||
-      trimmed.startsWith('data:') ||
-      trimmed.startsWith('#')
-    ) {
+    let resolved: URL;
+    try {
+      resolved = new URL(trimmed, base);
+    } catch {
+      // An href that isn't a valid URL is skipped, as browsers do.
       return;
     }
+    if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return;
+    // A link carrying a username or password can't be fetched, so it isn't followed.
+    if (resolved.username || resolved.password) return;
 
-    try {
-      const normalized = normalizeUrl(trimmed, baseUrl);
-      const parsed = new URL(normalized);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
-
-      if (!seen.has(normalized)) {
-        seen.add(normalized);
-        links.push({ url: normalized, element, resourceType });
-      }
-    } catch {
-      // Invalid URL — skip
-    }
+    resolved.hash = '';
+    const href = resolved.toString();
+    const id = normalizeUrl(href);
+    if (seen.has(id)) return;
+    seen.add(id);
+    links.push({ href, id, element, resourceType });
   };
 
-  // <a href>
-  doc.querySelectorAll('a[href]').forEach((el) => {
-    add(el.getAttribute('href'), 'a', 'page');
-  });
+  doc.querySelectorAll('a[href]').forEach((el) => add(el.getAttribute('href'), 'a', 'page'));
+  doc.querySelectorAll('script[src]').forEach((el) => add(el.getAttribute('src'), 'script', 'script'));
 
-  // <script src>
-  doc.querySelectorAll('script[src]').forEach((el) => {
-    add(el.getAttribute('src'), 'script', 'script');
-  });
-
-  // <link>
   doc.querySelectorAll('link[href]').forEach((el) => {
-    const rel = (el.getAttribute('rel') || '').toLowerCase();
-    if (rel.includes('stylesheet')) {
-      add(el.getAttribute('href'), 'link', 'stylesheet');
-    } else if (rel.includes('icon') || rel.includes('apple-touch-icon')) {
-      add(el.getAttribute('href'), 'link', 'image');
-    } else if (rel.includes('preload')) {
-      const as = (el.getAttribute('as') || '').toLowerCase();
-      const type: ResourceType = as === 'script' ? 'script'
-        : as === 'style' ? 'stylesheet'
-        : as === 'image' ? 'image'
-        : as === 'font' ? 'font'
-        : 'other';
-      add(el.getAttribute('href'), 'link', type);
-    } else {
-      add(el.getAttribute('href'), 'link', 'other');
-    }
+    const type = classifyLinkRel(el.getAttribute('rel') ?? '', el.getAttribute('as') ?? '');
+    if (type) add(el.getAttribute('href'), 'link', type);
   });
 
-  // <img src> and <img srcset>
   doc.querySelectorAll('img').forEach((el) => {
     add(el.getAttribute('src'), 'img', 'image');
-    const srcset = el.getAttribute('srcset');
-    if (srcset) {
-      srcset.split(',').forEach((entry) => {
-        const url = entry.trim().split(/\s+/)[0];
-        add(url, 'img', 'image');
-      });
-    }
+    srcsetUrls(el.getAttribute('srcset') ?? '').forEach((url) => add(url, 'img', 'image'));
   });
 
-  // <form action>
+  // Only GET forms can be checked with a plain request; posting to an endpoint with a GET reports a false error.
   doc.querySelectorAll('form[action]').forEach((el) => {
-    add(el.getAttribute('action'), 'form', 'page');
+    if ((el.getAttribute('method') ?? 'get').toLowerCase() === 'get') add(el.getAttribute('action'), 'form', 'page');
   });
+  doc.querySelectorAll('iframe[src]').forEach((el) => add(el.getAttribute('src'), 'iframe', 'page'));
 
-  // <iframe src>
-  doc.querySelectorAll('iframe[src]').forEach((el) => {
-    add(el.getAttribute('src'), 'iframe', 'page');
-  });
-
-  // <video src> and <video poster>
   doc.querySelectorAll('video').forEach((el) => {
     add(el.getAttribute('src'), 'video', 'media');
     add(el.getAttribute('poster'), 'video', 'image');
   });
-
-  // <source src>
-  doc.querySelectorAll('source[src]').forEach((el) => {
-    add(el.getAttribute('src'), 'source', 'media');
+  doc.querySelectorAll('audio[src]').forEach((el) => add(el.getAttribute('src'), 'audio', 'media'));
+  doc.querySelectorAll('source[src]').forEach((el) => add(el.getAttribute('src'), 'source', 'media'));
+  // Responsive images list their candidates on <source> inside <picture>.
+  doc.querySelectorAll('source[srcset]').forEach((el) => {
+    srcsetUrls(el.getAttribute('srcset') ?? '').forEach((url) => add(url, 'source', 'image'));
   });
 
-  // <meta http-equiv="refresh">
-  doc.querySelectorAll('meta[http-equiv="refresh"]').forEach((el) => {
-    const content = el.getAttribute('content') || '';
-    const match = content.match(/url=(.+)/i);
-    if (match) {
-      add(match[1].trim().replace(/^['"]|['"]$/g, ''), 'meta', 'page');
-    }
+  doc.querySelectorAll('meta[http-equiv="refresh" i]').forEach((el) => {
+    const match = (el.getAttribute('content') ?? '').match(/url=(.+)/i);
+    if (match) add(match[1].trim().replace(/^['"]|['"]$/g, ''), 'meta', 'page');
   });
 
   return links;

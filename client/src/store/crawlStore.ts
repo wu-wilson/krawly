@@ -1,65 +1,141 @@
 import { create } from 'zustand';
 
-import type { CrawlNode, CrawlEdge, CrawlStatus } from '../engine/types';
+import { DEFAULT_FILTER, EMPTY_STATS, computeStats } from './filters';
 
-/** Filter configuration */
-export interface FilterState {
-  statusFilter: 'all' | 'broken' | 'redirects' | 'slow';
-  typeFilter: 'all' | 'pages' | 'scripts' | 'styles' | 'images';
-  slowThreshold: number;
-  /** Case-insensitive URL substring filter. Empty string = no search filter. */
-  search: string;
-}
+import { URL_PARAMS, readUrlState } from '../utils/urlState';
 
-/** Computed crawl statistics */
-interface CrawlStats {
-  total: number;
-  healthy: number;
-  redirects: number;
-  broken: number;
-  avgResponseTime: number;
-}
+import type { CrawlEdge, CrawlNode, CrawlStatus } from '../engine/types';
+import type { CrawlStats, FilterState } from './filters';
 
-/** Crawl state store */
-interface CrawlStore {
+/** The two ways to look at a crawl */
+export type AppView = 'graph' | 'report';
+
+/** The view a crawl opens in */
+export const DEFAULT_VIEW: AppView = 'graph';
+
+/** Why a completed crawl ended */
+type EndReason = 'finished' | 'stopped';
+
+/** What the store holds */
+interface CrawlState {
   status: CrawlStatus;
+  /** Every node found, by id */
   nodes: Map<string, CrawlNode>;
   edges: CrawlEdge[];
+  /** Counts for the current nodes, refreshed with every flush */
+  stats: CrawlStats;
+  /** The page whose details are open */
   selectedNodeId: string | null;
   filter: FilterState;
+  view: AppView;
+  /** URL the crawl started from, as entered */
   startUrl: string | null;
+  /** Id of the start page's node, set when the crawler discovers it */
+  rootId: string | null;
   startTime: number | null;
-
-  pauseCrawl: () => void;
-  resumeCrawl: () => void;
-  stopCrawl: () => void;
-  resetCrawl: () => void;
-  addNode: (node: CrawlNode) => void;
-  updateNode: (id: string, updates: Partial<CrawlNode>) => void;
-  addEdge: (edge: CrawlEdge) => void;
-  selectNode: (id: string | null) => void;
-  setFilter: (filter: Partial<FilterState>) => void;
-  setStatus: (status: CrawlStatus) => void;
-
-  getFilteredNodes: (includeAncestors?: boolean) => CrawlNode[];
-  getFilteredEdges: () => CrawlEdge[];
-  getStats: () => CrawlStats;
+  /** When the crawl completed or was stopped */
+  endTime: number | null;
+  /** Time spent paused, so the reported duration only counts crawling */
+  pausedMs: number;
+  /** When the current pause began, while paused */
+  pausedAt: number | null;
+  endReason: EndReason | null;
+  /** True once the crawl left links out because it hit its URL limit */
+  limitReached: boolean;
 }
 
-/** Default filter state — "show everything, no search". Used to reset filters via `setFilter(DEFAULT_FILTER)`. */
-export const DEFAULT_FILTER: FilterState = {
-  statusFilter: 'all',
-  typeFilter: 'all',
-  slowThreshold: 1000,
-  search: '',
-};
+/** What the store can do */
+interface CrawlActions {
+  /** Clear the previous crawl's results and mark a new crawl as running */
+  beginCrawl: (url: string) => void;
+  pauseCrawl: () => void;
+  resumeCrawl: () => void;
+  /** End the crawl at the visitor's request */
+  stopCrawl: () => void;
+  /** End the crawl because it ran out of URLs */
+  completeCrawl: () => void;
+  /** Clear the crawl's results back to idle, keeping the view and filters */
+  resetCrawl: () => void;
+  addNode: (node: CrawlNode) => void;
+  /** Merge changes into a node, replacing it so selectors see the change */
+  updateNode: (id: string, updates: Partial<CrawlNode>) => void;
+  /** Record a link, once per source and target, and add the source to the target's `inbound` */
+  addEdge: (edge: CrawlEdge) => void;
+  selectNode: (id: string | null) => void;
+  /** Change some filters, keeping the rest */
+  setFilter: (filter: Partial<FilterState>) => void;
+  /** Reset every filter */
+  clearFilters: () => void;
+  setView: (view: AppView) => void;
+  /** Note that the crawl hit its URL limit */
+  setLimitReached: () => void;
+}
+
+/** Crawl state and the actions that change it */
+type CrawlStore = CrawlState & CrawlActions;
 
 /**
- * Zustand store for crawl state management
- * Uses batched updates to avoid creating new Map references on every node change.
+ * Select the start page's node.
+ * @param state - Store state
+ * @returns The node, once discovered
+ */
+export const selectRoot = (state: CrawlStore): CrawlNode | undefined =>
+  state.rootId ? state.nodes.get(state.rootId) : undefined;
+
+/**
+ * Select whether the crawl ended because the start page itself failed, leaving nothing to map.
+ * @param state - Store state
+ * @returns True when the crawl is over and the start page is broken
+ */
+export const selectRootFailed = (state: CrawlStore): boolean =>
+  state.status === 'complete' && selectRoot(state)?.status === 'broken';
+
+/**
+ * Select the query string that reopens the crawl as it's shown: its start URL, plus the view and filters that
+ * differ from the defaults.
+ * @param state - Store state
+ * @returns Query string without the leading "?", empty when there's no crawl
+ */
+export const selectUrlSearch = (state: CrawlStore): string => {
+  if (!state.startUrl) return '';
+  const { view, filter } = state;
+  const params = new URLSearchParams({ [URL_PARAMS.startUrl]: state.startUrl });
+  if (view !== DEFAULT_VIEW) params.set(URL_PARAMS.view, view);
+  if (filter.statusFilter !== DEFAULT_FILTER.statusFilter) params.set(URL_PARAMS.status, filter.statusFilter);
+  if (filter.typeFilter !== DEFAULT_FILTER.typeFilter) params.set(URL_PARAMS.type, filter.typeFilter);
+  if (filter.search.trim()) params.set(URL_PARAMS.search, filter.search.trim());
+  return params.toString();
+};
+
+const initialUrlState = readUrlState();
+
+/**
+ * Build the state of a crawl that hasn't started, with fresh collections each time.
+ * @returns Idle crawl fields
+ */
+const idleCrawl = (): Omit<CrawlState, 'filter' | 'view'> => ({
+  status: 'idle',
+  nodes: new Map(),
+  edges: [],
+  stats: EMPTY_STATS,
+  selectedNodeId: null,
+  startUrl: null,
+  rootId: null,
+  startTime: null,
+  endTime: null,
+  pausedMs: 0,
+  pausedAt: null,
+  endReason: null,
+  limitReached: false,
+});
+
+/**
+ * Read and update the crawl's nodes, edges, view, filters, and selection. Node and edge changes mutate in place and
+ * flush as one update per microtask, so hundreds of engine callbacks cost one render.
+ * @param selector - Picks the state to read; leave it out for the whole store
+ * @returns The selected state, re-rendering when it changes
  */
 export const useCrawlStore = create<CrawlStore>((set, get) => {
-  // --- Batching infrastructure ---
   let pendingFlush = false;
   let dirtyNodes = false;
   let dirtyEdges = false;
@@ -70,237 +146,115 @@ export const useCrawlStore = create<CrawlStore>((set, get) => {
     pendingFlush = true;
     queueMicrotask(() => {
       pendingFlush = false;
-      const patch: Record<string, unknown> = {};
       const state = get();
+      const patch: Partial<Pick<CrawlStore, 'nodes' | 'edges' | 'stats'>> = {};
       if (dirtyNodes) {
         patch.nodes = new Map(state.nodes);
+        patch.stats = computeStats(patch.nodes);
         dirtyNodes = false;
       }
       if (dirtyEdges) {
         patch.edges = [...state.edges];
         dirtyEdges = false;
       }
-      if (Object.keys(patch).length > 0) {
-        set(patch as Partial<CrawlStore>);
-      }
+      if (Object.keys(patch).length > 0) set(patch);
     });
   };
 
-  return {
-  status: 'idle',
-  nodes: new Map(),
-  edges: [],
-  selectedNodeId: null,
-  filter: { ...DEFAULT_FILTER },
-  startUrl: null,
-  startTime: null,
+  /**
+   * Fold an open pause into the paused total, for when the crawl resumes or ends.
+   * @param state - Current state
+   * @param now - Time the pause ends
+   * @returns Updated pause fields
+   */
+  const closePause = (state: CrawlStore, now: number): Pick<CrawlStore, 'pausedMs' | 'pausedAt'> => ({
+    pausedMs: state.pausedMs + (state.pausedAt !== null ? now - state.pausedAt : 0),
+    pausedAt: null,
+  });
 
-  pauseCrawl: () => {
-    set({ status: 'paused' });
-  },
+  const endCrawl = (reason: EndReason) => {
+    const state = get();
+    if (state.status !== 'crawling' && state.status !== 'paused') return;
+    const now = Date.now();
+    set({ status: 'complete', endTime: now, endReason: reason, ...closePause(state, now) });
+  };
 
-  resumeCrawl: () => {
-    set({ status: 'crawling' });
-  },
-
-  stopCrawl: () => {
-    set({ status: 'complete' });
-  },
-
-  resetCrawl: () => {
+  const resetCrawl = () => {
     edgeIndex.clear();
-    pendingFlush = false;
     dirtyNodes = false;
     dirtyEdges = false;
-    set({
-      status: 'idle',
-      nodes: new Map(),
-      edges: [],
-      selectedNodeId: null,
-      startUrl: null,
-      startTime: null,
-    });
-  },
+    set(idleCrawl());
+  };
 
-  addNode: (node: CrawlNode) => {
-    // Mutate in place, schedule a single batched flush
-    get().nodes.set(node.id, node);
-    dirtyNodes = true;
-    scheduleFlush();
-  },
+  return {
+    ...idleCrawl(),
+    filter: { ...DEFAULT_FILTER, ...initialUrlState.filter },
+    view: initialUrlState.view ?? DEFAULT_VIEW,
 
-  updateNode: (id: string, updates: Partial<CrawlNode>) => {
-    const nodes = get().nodes;
-    const existing = nodes.get(id);
-    if (!existing) return;
+    beginCrawl: (url: string) => {
+      resetCrawl();
+      set({ status: 'crawling', startUrl: url, startTime: Date.now() });
+    },
 
-    const updated = { ...existing, ...updates };
+    pauseCrawl: () => {
+      if (get().status !== 'crawling') return;
+      set({ status: 'paused', pausedAt: Date.now() });
+    },
 
-    // Merge inbound arrays instead of replacing
-    if (updates.inbound && updates.inbound.length === 0 && existing.inbound.length > 0) {
-      updated.inbound = existing.inbound;
-    }
+    resumeCrawl: () => {
+      const state = get();
+      if (state.status !== 'paused') return;
+      set({ status: 'crawling', ...closePause(state, Date.now()) });
+    },
 
-    nodes.set(id, updated);
-    dirtyNodes = true;
-    scheduleFlush();
-  },
+    stopCrawl: () => endCrawl('stopped'),
 
-  addEdge: (edge: CrawlEdge) => {
-    const key = `${edge.source}->${edge.target}`;
-    if (edgeIndex.has(key)) return;
-    edgeIndex.add(key);
+    completeCrawl: () => endCrawl('finished'),
 
-    // Update inbound on target node
-    const nodes = get().nodes;
-    const targetNode = nodes.get(edge.target);
-    if (targetNode && !targetNode.inbound.includes(edge.source)) {
-      nodes.set(edge.target, {
-        ...targetNode,
-        inbound: [...targetNode.inbound, edge.source],
-      });
+    resetCrawl,
+
+    addNode: (node: CrawlNode) => {
+      get().nodes.set(node.id, node);
+      if (node.parentId === null) set({ rootId: node.id });
       dirtyNodes = true;
-    }
+      scheduleFlush();
+    },
 
-    get().edges.push(edge);
-    dirtyEdges = true;
-    scheduleFlush();
-  },
+    updateNode: (id: string, updates: Partial<CrawlNode>) => {
+      const nodes = get().nodes;
+      const existing = nodes.get(id);
+      if (!existing) return;
+      nodes.set(id, { ...existing, ...updates });
+      dirtyNodes = true;
+      scheduleFlush();
+    },
 
-  selectNode: (id: string | null) => {
-    set({ selectedNodeId: id });
-  },
+    addEdge: (edge: CrawlEdge) => {
+      const key = `${edge.source}->${edge.target}`;
+      if (edgeIndex.has(key)) return;
+      edgeIndex.add(key);
 
-  setFilter: (filter: Partial<FilterState>) => {
-    set((state) => ({
-      filter: { ...state.filter, ...filter },
-    }));
-  },
-
-  setStatus: (status: CrawlStatus) => {
-    set({ status });
-  },
-
-  getFilteredNodes: (includeAncestors = true) => {
-    const { nodes, filter } = get();
-    const searchQuery = filter.search.trim().toLowerCase();
-
-    // No filter active — return all
-    if (filter.statusFilter === 'all' && filter.typeFilter === 'all' && searchQuery === '') {
-      return Array.from(nodes.values());
-    }
-
-    /** Check if a node directly matches the active filter criteria */
-    const matchesFilter = (node: CrawlNode): boolean => {
-      if (filter.statusFilter !== 'all') {
-        switch (filter.statusFilter) {
-          case 'broken':
-            if (node.status !== 'broken') return false;
-            break;
-          case 'redirects':
-            if (node.redirectChain.length <= 1) return false;
-            break;
-          case 'slow':
-            if (node.responseTime === null || node.responseTime < filter.slowThreshold) return false;
-            break;
-        }
+      // Keep the target's inbound list in step with its edges.
+      const nodes = get().nodes;
+      const target = nodes.get(edge.target);
+      if (target && !target.inbound.includes(edge.source)) {
+        nodes.set(edge.target, { ...target, inbound: [...target.inbound, edge.source] });
+        dirtyNodes = true;
       }
 
-      if (filter.typeFilter !== 'all') {
-        switch (filter.typeFilter) {
-          case 'pages':
-            if (node.resourceType !== 'page') return false;
-            break;
-          case 'scripts':
-            if (node.resourceType !== 'script') return false;
-            break;
-          case 'styles':
-            if (node.resourceType !== 'stylesheet') return false;
-            break;
-          case 'images':
-            if (node.resourceType !== 'image') return false;
-            break;
-        }
-      }
+      get().edges.push(edge);
+      dirtyEdges = true;
+      scheduleFlush();
+    },
 
-      if (searchQuery !== '' && !node.url.toLowerCase().includes(searchQuery)) {
-        return false;
-      }
+    selectNode: (id: string | null) => set({ selectedNodeId: id }),
 
-      return true;
-    };
+    setFilter: (filter: Partial<FilterState>) => set((state) => ({ filter: { ...state.filter, ...filter } })),
 
-    // Collect nodes that directly match the filter
-    const visibleIds = new Set<string>();
-    const allNodes = Array.from(nodes.values());
+    clearFilters: () => set({ filter: DEFAULT_FILTER }),
 
-    for (const node of allNodes) {
-      if (matchesFilter(node)) {
-        visibleIds.add(node.id);
-      }
-    }
+    setView: (view: AppView) => set({ view }),
 
-    // Walk up ancestor chains so the graph stays connected —
-    // only when requested (graph needs this, report table does not)
-    if (includeAncestors) {
-      const addAncestors = (nodeId: string) => {
-        const node = nodes.get(nodeId);
-        if (!node || !node.parentId) return;
-        if (visibleIds.has(node.parentId)) return;
-        visibleIds.add(node.parentId);
-        addAncestors(node.parentId);
-      };
-
-      for (const id of [...visibleIds]) {
-        addAncestors(id);
-      }
-    }
-
-    return allNodes.filter((node) => visibleIds.has(node.id));
-  },
-
-  getFilteredEdges: () => {
-    const { edges } = get();
-    const filteredNodes = get().getFilteredNodes();
-    const filteredIds = new Set(filteredNodes.map((n) => n.id));
-    return edges.filter((e) => filteredIds.has(e.source) && filteredIds.has(e.target));
-  },
-
-  getStats: () => {
-    const { nodes } = get();
-    const allNodes = Array.from(nodes.values());
-
-    let healthy = 0;
-    let redirects = 0;
-    let broken = 0;
-    let totalTime = 0;
-    let timeCount = 0;
-
-    for (const node of allNodes) {
-      if (node.redirectChain.length > 1) {
-        redirects++;
-      }
-      switch (node.status) {
-        case 'healthy':
-          healthy++;
-          break;
-        case 'broken':
-          broken++;
-          break;
-      }
-      if (typeof node.responseTime === 'number' && node.responseTime > 0) {
-        totalTime += node.responseTime;
-        timeCount++;
-      }
-    }
-
-    return {
-      total: allNodes.length,
-      healthy,
-      redirects,
-      broken,
-      avgResponseTime: timeCount > 0 ? totalTime / timeCount : 0,
-    };
-  },
+    setLimitReached: () => set({ limitReached: true }),
   };
 });

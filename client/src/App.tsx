@@ -1,113 +1,106 @@
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useState } from 'react';
 
-import { LandingPage, markEntrancePlayed } from './components/Landing/LandingPage';
-import { Navbar } from './components/Navbar';
-import { StatusBar } from './components/StatusBar';
-import { GraphCanvas } from './components/Graph/GraphCanvas';
-import { ReportTable } from './components/Report/ReportTable';
-import { NodeDetail } from './components/Sidebar/NodeDetail';
+import { CrawlFailed } from './components/App/CrawlFailed';
+import { FilterBar } from './components/App/FilterBar';
+import { LimitNotice } from './components/App/LimitNotice';
+import { PhoneControls } from './components/App/PhoneControls';
+import { TopBar } from './components/App/TopBar';
+import { DetailPanel, PANEL_QUERY, PANEL_WIDTH, SHEET_HEIGHT } from './components/Detail/DetailPanel';
+import { GraphView } from './components/Graph/GraphView';
+import { LandingPage } from './components/Landing/LandingPage';
+import { ReportView } from './components/Report/ReportView';
 
 import { useCrawl } from './hooks/useCrawl';
-import { useUrlParams } from './hooks/useUrlParams';
-import { useCrawlStore, DEFAULT_FILTER } from './store/crawlStore';
+import { useLandingHandoff } from './hooks/useLandingHandoff';
+import { useMediaQuery } from './hooks/useMediaQuery';
+import { useUrlSync } from './hooks/useUrlSync';
+import { selectRootFailed, useCrawlStore } from './store/crawlStore';
 
 /**
- * Root application component
- * @returns The main app layout
+ * Root application component: the landing page until a crawl starts, then the app.
+ * @returns The landing page or the app shell
  */
 export const App: React.FC = () => {
   const status = useCrawlStore((s) => s.status);
-  const [view, setView] = React.useState<'graph' | 'report'>('graph');
-  const [isTransitioning, setIsTransitioning] = React.useState(false);
-  const [showLanding, setShowLanding] = React.useState(true);
+  const view = useCrawlStore((s) => s.view);
+  const setView = useCrawlStore((s) => s.setView);
+  const selectNode = useCrawlStore((s) => s.selectNode);
+  const detailsOpen = useCrawlStore((s) => s.selectedNodeId !== null && s.view === 'graph');
+  const limitReached = useCrawlStore((s) => s.limitReached);
+  const rootFailed = useCrawlStore(selectRootFailed);
+  const detailLayout = useMediaQuery(PANEL_QUERY) ? 'panel' : 'sheet';
+  const { startCrawl, clearCrawl } = useCrawl();
+  const { showLanding, isTransitioning, draftAddress, startFromLanding, goHome } = useLandingHandoff(startCrawl, clearCrawl);
 
-  const resetCrawl = useCrawlStore((s) => s.resetCrawl);
-  const stopCrawl = useCrawlStore((s) => s.stopCrawl);
-  const setFilter = useCrawlStore((s) => s.setFilter);
-  const { startCrawl } = useCrawl();
+  useUrlSync();
 
-  useUrlParams(view, setView);
+  // The address field assumes https://, so only an http:// address keeps its scheme.
+  const handleChangeAddress = useCallback(() => {
+    goHome(useCrawlStore.getState().startUrl?.replace(/^https:\/\//i, ''));
+  }, [goHome]);
 
-  // Auto-start crawl when a shared link with ?u= is opened.
-  // Guard makes "run exactly once per mount" explicit even if `startCrawl` changes identity.
-  const autoStartedRef = useRef(false);
-  useEffect(() => {
-    if (autoStartedRef.current) return;
-    autoStartedRef.current = true;
-    const params = new URLSearchParams(window.location.search);
-    const seed = params.get('u');
-    if (seed) {
-      markEntrancePlayed();
-      setShowLanding(false);
-      startCrawl(seed);
-    }
+  const handleRetry = useCallback(() => {
+    const { startUrl } = useCrawlStore.getState();
+    if (startUrl) startCrawl(startUrl);
   }, [startCrawl]);
 
-  const handleStartCrawl = useCallback((url: string) => {
-    markEntrancePlayed();
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setShowLanding(false);
-      startCrawl(url);
-      const params = new URLSearchParams(window.location.search);
-      params.set('u', url);
-      window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
-      setTimeout(() => {
-        setIsTransitioning(false);
-      }, 300);
-    }, 200);
-  }, [startCrawl]);
-
-  const handleViewChange = useCallback((newView: 'graph' | 'report') => {
-    setView(newView);
-  }, []);
-
-  const handleLogoClick = useCallback(() => {
-    stopCrawl();
-    resetCrawl();
-    setFilter(DEFAULT_FILTER);
-    setShowLanding(true);
-    setView('graph');
-    window.history.replaceState(null, '', window.location.pathname);
-  }, [stopCrawl, resetCrawl, setFilter]);
+  // Bumped when a report row opens a page, so focus follows to the details even when they already show that page.
+  const [detailsFocus, setDetailsFocus] = useState(0);
+  const handleShowInGraph = useCallback(
+    (id: string) => {
+      selectNode(id);
+      setView('graph');
+      setDetailsFocus((n) => n + 1);
+    },
+    [selectNode, setView],
+  );
 
   if (showLanding && status === 'idle') {
-    return (
-      <LandingPage
-        onStartCrawl={handleStartCrawl}
-        isTransitioning={isTransitioning}
-      />
-    );
+    return <LandingPage onStartCrawl={startFromLanding} isTransitioning={isTransitioning} initialAddress={draftAddress} />;
   }
 
+  // The map leaves room for the details, beside it as a side panel or under it as a sheet.
+  const insetRight = detailsOpen && detailLayout === 'panel' ? PANEL_WIDTH : 0;
+  const insetBottom = detailsOpen && detailLayout === 'sheet' ? SHEET_HEIGHT : 0;
+
   return (
-    <div className="flex flex-col h-svh bg-bg-primary text-text-primary overflow-hidden">
-      <Navbar
-        view={view}
-        onViewChange={handleViewChange}
-        onLogoClick={handleLogoClick}
-      />
-      <div className="flex-1 relative overflow-hidden">
-        <div
-          className={`absolute inset-0 ${
-            view === 'graph' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-          }`}
-        >
-          <GraphCanvas />
-        </div>
-        <div
-          className={`absolute inset-0 overflow-auto ${
-            view === 'report' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-          }`}
-        >
-          <ReportTable onSelectNode={handleViewChange} />
-        </div>
-        {/* Wrapped (not conditionally rendered) so NodeDetail's state survives view switches; display:none gives an instant hide with no animation. */}
-        <div className={view === 'graph' ? undefined : 'hidden'} aria-hidden={view !== 'graph'}>
-          <NodeDetail />
-        </div>
-      </div>
-      <StatusBar />
+    <div
+      className="flex h-svh flex-col overflow-hidden bg-surface pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-[13px]
+        leading-normal text-ink"
+    >
+      <TopBar onHome={() => goHome()} />
+      {!rootFailed && (
+        <>
+          <div className="sm:hidden">
+            <PhoneControls />
+          </div>
+          <div className="max-sm:hidden">
+            <FilterBar />
+          </div>
+          {limitReached && <LimitNotice />}
+        </>
+      )}
+      {/* Focusable from script only, so focus has somewhere to land when an empty state's action removes it. */}
+      <main tabIndex={-1} className="relative min-h-0 flex-1 overflow-hidden outline-none">
+        {rootFailed ? (
+          <CrawlFailed onRetry={handleRetry} onChangeAddress={handleChangeAddress} />
+        ) : (
+          <>
+            {/* Both views stay mounted so the map's layout and the table's scroll survive a switch. The hidden one is
+                `invisible`, which also takes it out of the tab order and the accessibility tree. */}
+            <div className={`absolute inset-0 ${view === 'graph' ? '' : 'invisible'}`}>
+              <GraphView insetRight={insetRight} insetBottom={insetBottom} active={view === 'graph'} />
+            </div>
+            <div className={`absolute inset-0 overflow-auto bg-surface pb-[env(safe-area-inset-bottom)] ${view === 'report' ? '' : 'invisible'}`}>
+              <ReportView active={view === 'report'} onShowInGraph={handleShowInGraph} />
+            </div>
+            {/* Hidden rather than unmounted, so the details come back as they were when you return to the map. */}
+            <div className={view === 'graph' ? undefined : 'hidden'}>
+              <DetailPanel layout={detailLayout} focusRequest={detailsFocus} />
+            </div>
+          </>
+        )}
+      </main>
     </div>
   );
 };

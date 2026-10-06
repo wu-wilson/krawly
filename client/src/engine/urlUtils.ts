@@ -1,57 +1,32 @@
-/** Tracking parameters to strip during normalization */
+// Tracking parameters to strip during normalization.
 const TRACKING_PARAMS = new Set([
   'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
   'fbclid', 'gclid', 'mc_cid', 'mc_eid',
 ]);
 
+/** Matches an http(s) scheme at the start of an address */
+export const HTTP_SCHEME = /^https?:\/\//i;
+
 /**
- * Normalize a URL for deduplication
- * @param url - The URL to normalize
- * @param base - Optional base URL for resolving relative URLs
- * @returns Normalized URL string
+ * Normalize a URL for deduplication: drop the fragment, tracking parameters, and a trailing slash, and sort the
+ * remaining query parameters. (The URL parser already lowercases the host and drops default ports.)
+ * @param url - Absolute URL to normalize
+ * @returns Normalized URL, or the input unchanged when it isn't a parseable http(s) URL
  */
-export const normalizeUrl = (url: string, base?: string): string => {
+export const normalizeUrl = (url: string): string => {
   try {
-    const parsed = new URL(url, base);
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return url;
 
-    // Only allow http/https
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return url;
-    }
-
-    // Lowercase hostname
-    parsed.hostname = parsed.hostname.toLowerCase();
-
-    // Remove default ports
-    if (
-      (parsed.protocol === 'http:' && parsed.port === '80') ||
-      (parsed.protocol === 'https:' && parsed.port === '443')
-    ) {
-      parsed.port = '';
-    }
-
-    // Remove fragment
     parsed.hash = '';
+    const params = [...parsed.searchParams]
+      .filter(([key]) => !TRACKING_PARAMS.has(key))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    parsed.search = new URLSearchParams(params).toString();
 
-    // Sort query parameters and strip tracking params
-    const params = new URLSearchParams(parsed.search);
-    const sortedParams = new URLSearchParams();
-    const keys = Array.from(params.keys()).sort();
-    for (const key of keys) {
-      if (!TRACKING_PARAMS.has(key)) {
-        const val = params.get(key);
-        if (val !== null) {
-          sortedParams.set(key, val);
-        }
-      }
-    }
-    parsed.search = sortedParams.toString();
-
-    // Remove trailing slash from path (except root)
     if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
       parsed.pathname = parsed.pathname.slice(0, -1);
     }
-
     return parsed.toString();
   } catch {
     return url;
@@ -59,47 +34,44 @@ export const normalizeUrl = (url: string, base?: string): string => {
 };
 
 /**
- * Check if two URLs are on the same domain
+ * Turn a typed or shared address into a crawlable URL, adding https:// when the scheme is missing.
+ * @param raw - Address such as "example.com" or "http://example.com/blog"
+ * @returns The URL, or null when its host isn't a dotted name such as example.com or it carries a username or
+ * password (as a typed email address does)
+ */
+export const toCrawlUrl = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const url = HTTP_SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const { hostname, username, password } = new URL(url);
+    if (username || password) return null;
+    return hostname.includes('.') && !hostname.startsWith('.') && !hostname.endsWith('.') ? url : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Get the hostname of a URL.
+ * @param url - Any URL
+ * @returns Hostname, or an empty string when the URL can't be parsed
+ */
+export const hostOf = (url: string): string => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * Check whether two URLs are on the same host.
  * @param url - URL to check
- * @param baseUrl - Base URL to compare against
- * @returns True if same domain
+ * @param baseUrl - URL to compare against
+ * @returns True when both parse and share a hostname
  */
-export const isSameDomain = (url: string, baseUrl: string): boolean => {
-  try {
-    const a = new URL(url);
-    const b = new URL(baseUrl);
-    return a.hostname.toLowerCase() === b.hostname.toLowerCase();
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Check if a string is a valid HTTP/HTTPS URL
- * @param url - String to validate
- * @returns True if valid
- */
-export const isValidUrl = (url: string): boolean => {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Get a shortened display version of a URL
- * @param url - Full URL
- * @returns Shortened display string
- */
-export const getDisplayUrl = (url: string): string => {
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname + parsed.search;
-    const display = parsed.hostname + (path === '/' ? '' : path);
-    return display.length > 60 ? display.slice(0, 57) + '...' : display;
-  } catch {
-    return url;
-  }
+export const isSameHost = (url: string, baseUrl: string): boolean => {
+  const host = hostOf(url);
+  return host !== '' && host === hostOf(baseUrl);
 };

@@ -1,214 +1,114 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React from 'react';
 
-import { FilterChips } from '../FilterChips';
-import { STATUS_STYLES } from '../Graph/GraphNode';
+import { TONE_CLASS } from '../Detail/StatusCode';
+import { Icon } from '../UI/Icon';
+import { FOCUS_RING, HOVER_TRANSITION, rowBackground } from '../UI/styles';
 
-import { useCrawlStore } from '../../store/crawlStore';
+import { isSlow } from '../../engine/limits';
+import { responseMs } from '../../engine/statusText';
 
-import { getDisplayUrl } from '../../engine/urlUtils';
-
-type SortField = 'url' | 'status' | 'responseTime' | 'type' | 'depth';
-type SortDir = 'asc' | 'desc';
+import type { ReportRow, SortField, SortState } from './reportRows';
 
 interface ReportTableProps {
-  /** Called when a node is selected — switches to graph view */
-  onSelectNode: (view: 'graph') => void;
+  /** Sorted rows */
+  rows: ReportRow[];
+  /** Current sort */
+  sort: SortState;
+  /** Sort by a column, or flip the direction if it's already sorted by it */
+  onSort: (field: SortField) => void;
+  /** Open a page in the graph view */
+  onOpen: (id: string) => void;
+  /** The page whose details are open */
+  selectedId: string | null;
 }
 
+const COLUMNS: Array<{ field: SortField; label: string; align: 'start' | 'end' }> = [
+  { field: 'page', label: 'Page', align: 'start' },
+  { field: 'status', label: 'Status', align: 'start' },
+  { field: 'type', label: 'Type', align: 'start' },
+  { field: 'response', label: 'Response', align: 'end' },
+  { field: 'depth', label: 'Depth', align: 'end' },
+  { field: 'links', label: 'Links found', align: 'end' },
+];
+
+const GRID = 'grid grid-cols-[minmax(0,1fr)_220px_110px_100px_80px_100px] items-center gap-x-4 px-5';
+// The row's one control is the page link, stretched over the whole row; its focus ring is drawn on the row.
+const ROW_FOCUS = 'has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent';
+
 /**
- * Sortable, filterable URL table for the report view
- * @param props - Table configuration
- * @returns Report table or card list on mobile
+ * Every page as a sortable table. Status leads with the code in its tone and the reason in ink-2, and slow times are
+ * set in ink so they stand out. On ultrawide screens the table stops at 1600px and centres.
+ * @param props - Rows, sort state, and handlers
+ * @returns Report table
  */
-export const ReportTable: React.FC<ReportTableProps> = ({ onSelectNode }) => {
-  const nodes = useCrawlStore((s) => s.nodes);
-  const getFilteredNodes = useCrawlStore((s) => s.getFilteredNodes);
-  const selectNode = useCrawlStore((s) => s.selectNode);
-  const status = useCrawlStore((s) => s.status);
-
-  const [sortField, setSortField] = useState<SortField>('url');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  const filteredNodes = getFilteredNodes(false);
-
-  const sorted = useMemo(() => {
-    const result = [...filteredNodes];
-
-    result.sort((a, b) => {
-      let cmp = 0;
-      switch (sortField) {
-        case 'url':
-          cmp = a.url.localeCompare(b.url);
-          break;
-        case 'status':
-          cmp = (a.httpStatus || 0) - (b.httpStatus || 0);
-          break;
-        case 'responseTime':
-          cmp = (a.responseTime || 0) - (b.responseTime || 0);
-          break;
-        case 'type':
-          cmp = a.resourceType.localeCompare(b.resourceType);
-          break;
-        case 'depth':
-          cmp = a.depth - b.depth;
-          break;
-      }
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-
-    return result;
-  }, [filteredNodes, sortField, sortDir]);
-
-  const handleSort = useCallback((field: SortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDir('asc');
-    }
-  }, [sortField]);
-
-  const handleRowClick = useCallback((nodeId: string) => {
-    selectNode(nodeId);
-    onSelectNode('graph');
-  }, [selectNode, onSelectNode]);
-
-  if (nodes.size === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-text-tertiary">
-        <p className="text-sm">
-          {status === 'crawling' || status === 'paused'
-            ? 'Crawling... results will appear here.'
-            : 'No results yet.'}
-        </p>
-        {(status === 'crawling' || status === 'paused') && (
-          <div className="mt-3 w-4 h-4 rounded-full bg-brand/30 animate-pulse" />
-        )}
-      </div>
-    );
-  }
-
-  const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
-    if (sortField !== field) return null;
-    return (
-      <svg className="w-3 h-3 text-brand inline ml-1" viewBox="0 0 20 20" fill="currentColor">
-        {sortDir === 'asc' ? (
-          <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-        ) : (
-          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-        )}
-      </svg>
-    );
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar: FilterChips owns both the chip filters and the search input */}
-      <div className="flex items-center px-4 sm:px-6 py-3 border-b border-border
-        overflow-x-auto scrollbar-hide">
-        <FilterChips />
-      </div>
-
-      {/* Desktop table */}
-      <div className="hidden md:block flex-1 overflow-auto">
-        <table className="w-full" role="table">
-          <thead className="sticky top-0 bg-bg-secondary z-10">
-            <tr className="border-b border-border">
-              {([
-                { field: 'url' as SortField, label: 'URL' },
-                { field: 'status' as SortField, label: 'Status' },
-                { field: 'responseTime' as SortField, label: 'Time' },
-                { field: 'type' as SortField, label: 'Type' },
-                { field: 'depth' as SortField, label: 'Depth' },
-              ]).map(({ field, label }) => (
-                <th
-                  key={field}
-                  scope="col"
-                  className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary cursor-pointer
-                    hover:text-text-primary transition-colors duration-150 select-none"
-                  onClick={() => handleSort(field)}
-                >
-                  {label}
-                  <SortIcon field={field} />
-                </th>
-              ))}
-              <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-text-secondary">
-                Links
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((node) => {
-              const style = STATUS_STYLES[node.status];
-              return (
-                <tr
-                  key={node.id}
-                  onClick={() => handleRowClick(node.id)}
-                  className="border-b border-border-subtle hover:bg-surface-hover cursor-pointer
-                    transition-colors duration-100"
-                >
-                  <td className="px-4 py-2.5 text-sm font-mono text-text-primary max-w-xs truncate">
-                    {getDisplayUrl(node.url)}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={`${style.bg} ${style.text} rounded-full px-2 py-0.5 text-xs font-mono`}
-                      aria-label={`Status: ${node.httpStatus || ''} ${style.label}`}
-                    >
-                      {node.httpStatus || '—'} {style.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-sm font-mono text-text-secondary">
-                    {node.responseTime !== null ? `${node.responseTime}ms` : '—'}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <span className="bg-bg-tertiary text-text-secondary rounded-full px-2 py-0.5 text-xs">
-                      {node.resourceType}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-sm font-mono text-text-secondary">
-                    {node.depth}
-                  </td>
-                  <td className="px-4 py-2.5 text-sm font-mono text-text-secondary">
-                    {node.inbound.length}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile card list */}
-      <div className="md:hidden flex-1 overflow-auto px-4 py-3 space-y-2">
-        {sorted.map((node) => {
-          const style = STATUS_STYLES[node.status];
+export const ReportTable: React.FC<ReportTableProps> = ({ rows, sort, onSort, onOpen, selectedId }) => (
+  <div role="table" aria-label="Pages found" aria-rowcount={rows.length + 1} className="mx-auto max-w-[1600px]">
+    <div role="rowgroup" className="sticky top-0 z-10 bg-surface">
+      <div role="row" className={`${GRID} h-9 border-b border-line text-xs font-medium text-ink-3 coarse:h-11`}>
+        {COLUMNS.map((column) => {
+          const active = sort.field === column.field;
           return (
-            <button
-              key={node.id}
-              onClick={() => handleRowClick(node.id)}
-              className="w-full text-left p-3 rounded-lg border border-border bg-bg-secondary
-                hover:bg-surface-hover transition-colors duration-150
-                focus:outline-none focus:ring-2 focus:ring-brand/50"
+            <div
+              key={column.field}
+              role="columnheader"
+              aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+              className={column.align === 'end' ? 'justify-self-end' : 'justify-self-start'}
             >
-              <div className="flex items-start justify-between gap-2 mb-1.5">
-                <span className="text-sm font-mono text-text-primary break-all leading-relaxed flex-1">
-                  {getDisplayUrl(node.url)}
-                </span>
-                <span
-                  className={`${style.bg} ${style.text} rounded-full px-2 py-0.5 text-xs font-mono flex-shrink-0`}
-                >
-                  {node.httpStatus || '—'}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-text-tertiary">
-                {node.responseTime !== null && <span className="font-mono">{node.responseTime}ms</span>}
-                <span>{node.resourceType}</span>
-              </div>
-            </button>
+              <button
+                type="button"
+                onClick={() => onSort(column.field)}
+                className={`flex cursor-pointer items-center gap-1 rounded-sm coarse:h-8 ${active ? 'text-ink' : 'hover:text-ink'} ${HOVER_TRANSITION} ${FOCUS_RING}`}
+              >
+                {column.label}
+                {active && <Icon name="chevron" size={11} className={sort.dir === 'desc' ? 'rotate-180' : ''} />}
+              </button>
+            </div>
           );
         })}
       </div>
     </div>
-  );
-};
+    <div role="rowgroup">
+      {rows.map(({ node, path, status, type }) => {
+        const selected = node.id === selectedId;
+        const ms = responseMs(node);
+        return (
+          <div
+            key={node.id}
+            role="row"
+            aria-current={selected || undefined}
+            className={`${GRID} relative h-10 border-b border-line-soft text-[12.5px] tabular-nums text-ink
+              ${rowBackground(selected)} ${HOVER_TRANSITION} ${ROW_FOCUS}`}
+          >
+            <span role="cell" className="min-w-0">
+              <button
+                type="button"
+                onClick={() => onOpen(node.id)}
+                title={node.url}
+                className="block w-full scroll-mt-9 cursor-pointer truncate text-left font-medium leading-10 outline-none after:absolute after:inset-0
+                  after:content-[''] coarse:scroll-mt-11"
+              >
+                {path}
+              </button>
+            </span>
+            <span role="cell" className="flex items-baseline gap-2 whitespace-nowrap">
+              {status.code !== null && <span className={`font-medium ${TONE_CLASS[status.tone]}`}>{status.code}</span>}
+              <span className={status.code === null ? `font-medium ${TONE_CLASS[status.tone]}` : 'text-ink-2'}>{status.reason}</span>
+            </span>
+            <span role="cell" className="text-ink-2">
+              {type}
+            </span>
+            <span role="cell" className={`text-right ${isSlow(node) ? 'text-ink' : 'text-ink-2'}`}>
+              {ms !== null ? `${ms} ms` : ''}
+            </span>
+            <span role="cell" className="text-right text-ink-2">
+              {node.depth}
+            </span>
+            <span role="cell" className="text-right text-ink-2">
+              {node.outbound.length}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);

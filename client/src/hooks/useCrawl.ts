@@ -4,97 +4,74 @@ import { useCrawlStore } from '../store/crawlStore';
 
 import { createCrawler } from '../engine/crawler';
 
-import type { CrawlNode, CrawlEdge } from '../engine/types';
+const PROXY_URL = import.meta.env.VITE_PROXY_URL || 'http://localhost:3001';
 
 interface UseCrawlReturn {
-  /** Start a crawl for the given URL. Tears down any in-flight crawl first, so it's safe to call repeatedly. */
+  /** Start a crawl, replacing any crawl in progress */
   startCrawl: (url: string) => void;
+  /** Stop any crawl and clear its results */
+  clearCrawl: () => void;
 }
 
 /**
- * Hook to manage the crawl lifecycle — creates a crawler and wires it to the store
- * @returns Crawl control functions
+ * Run crawls against the store: each crawl gets its own crawler, wired so the store's pause, resume, and stop
+ * reach it and its discoveries reach the store.
+ * @returns Crawl controls
  */
 export const useCrawl = (): UseCrawlReturn => {
-  const addNode = useCrawlStore((s) => s.addNode);
-  const updateNode = useCrawlStore((s) => s.updateNode);
-  const addEdge = useCrawlStore((s) => s.addEdge);
-  const setStatus = useCrawlStore((s) => s.setStatus);
-  const resetCrawl = useCrawlStore((s) => s.resetCrawl);
-
-  const crawlerRef = useRef<ReturnType<typeof createCrawler> | null>(null);
   const teardownRef = useRef<(() => void) | null>(null);
 
-  const startCrawl = useCallback((url: string) => {
-    // Tear down any in-flight crawler from a prior call so we never have two
-    // running against the same store at once.
+  const teardown = useCallback(() => {
     teardownRef.current?.();
     teardownRef.current = null;
+  }, []);
 
-    resetCrawl();
+  const startCrawl = useCallback((url: string) => {
+    teardown();
+    const store = useCrawlStore.getState();
+    store.beginCrawl(url);
 
-    const proxyUrl = import.meta.env.VITE_PROXY_URL || 'http://localhost:3001';
-
-    // `alive` gates every store write from this crawler. Teardown flips it
-    // false so leftover async work (aborted fetches, queue cleanup) can't
-    // poison the next crawler's nodes when URLs collide.
+    // Gates every store write from this crawler, so a torn-down crawler's leftover async work can't write into
+    // the next crawl.
     let alive = true;
-
-    const crawler = createCrawler(
-      {
-        maxConcurrent: 6,
-        maxDepth: 3,
-        maxUrls: 200,
-        batchDelay: 100,
+    const crawler = createCrawler(PROXY_URL, {
+      onNodeDiscovered: (node) => {
+        if (alive) store.addNode(node);
       },
-      proxyUrl,
-      {
-        onNodeDiscovered: (node: CrawlNode) => {
-          if (alive) addNode(node);
-        },
-        onNodeUpdated: (id: string, updates: Partial<CrawlNode>) => {
-          if (alive) updateNode(id, updates);
-        },
-        onEdgeDiscovered: (edge: CrawlEdge) => {
-          if (alive) addEdge(edge);
-        },
-        onComplete: () => {
-          if (alive) setStatus('complete');
-        },
-      }
-    );
+      onNodeUpdated: (id, updates) => {
+        if (alive) store.updateNode(id, updates);
+      },
+      onEdgeDiscovered: (edge) => {
+        if (alive) store.addEdge(edge);
+      },
+      onLimitReached: () => {
+        if (alive) store.setLimitReached();
+      },
+      onComplete: () => {
+        if (alive) store.completeCrawl();
+      },
+    });
 
-    crawlerRef.current = crawler;
-
-    // Wire pause/resume/stop to store
-    const unsub1 = useCrawlStore.subscribe((state, prev) => {
-      if (state.status === 'paused' && prev.status === 'crawling') {
-        crawler.pause();
-      } else if (state.status === 'crawling' && prev.status === 'paused') {
-        crawler.resume();
-      } else if (state.status === 'complete' && prev.status !== 'complete') {
-        crawler.stop();
-      }
+    const unsubscribe = useCrawlStore.subscribe((state, prev) => {
+      if (state.status === prev.status) return;
+      if (state.status === 'paused') crawler.pause();
+      else if (state.status === 'crawling') crawler.resume();
+      else if (state.status === 'complete') crawler.stop();
     });
 
     teardownRef.current = () => {
       alive = false;
       crawler.stop();
-      unsub1();
+      unsubscribe();
     };
 
-    useCrawlStore.setState({
-      stopCrawl: () => {
-        crawler.stop();
-        setStatus('complete');
-        unsub1();
-      },
-    });
-
-    setStatus('crawling');
-    useCrawlStore.setState({ startUrl: url, startTime: Date.now() });
     crawler.start(url);
-  }, [addNode, updateNode, addEdge, setStatus, resetCrawl]);
+  }, [teardown]);
 
-  return { startCrawl };
+  const clearCrawl = useCallback(() => {
+    teardown();
+    useCrawlStore.getState().resetCrawl();
+  }, [teardown]);
+
+  return { startCrawl, clearCrawl };
 };

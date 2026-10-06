@@ -3,8 +3,8 @@ import cors from 'cors';
 import type { CorsOptions } from 'cors';
 
 /**
- * Create CORS middleware configured from environment
- * @returns Configured CORS middleware
+ * Create CORS middleware that allows the comma-separated origins in `ALLOWED_ORIGINS`, or any origin when it's unset.
+ * @returns CORS middleware
  */
 export const createCorsMiddleware = () => {
   const allowedOrigins = process.env.ALLOWED_ORIGINS

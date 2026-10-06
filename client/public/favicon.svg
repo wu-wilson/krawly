@@ -1,21 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 120 120">
-  <!-- Legs - left side (3) -->
-  <path d="M31.5 31.5 Q16 20.6 3.6 16" stroke="#d4a017" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-  <path d="M28.4 50 Q8.3 50 -5.6 50" stroke="#d4a017" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-  <path d="M31.5 68.5 Q16 79.4 3.6 87.1" stroke="#d4a017" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-  <!-- Legs - right side (3) -->
-  <path d="M68.5 31.5 Q84 20.6 96.4 16" stroke="#d4a017" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-  <path d="M71.6 50 Q91.7 50 105.6 50" stroke="#d4a017" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-  <path d="M68.5 68.5 Q84 79.4 96.4 87.1" stroke="#d4a017" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-  <!-- Body -->
-  <circle cx="50" cy="50" r="34" fill="#d4a017"/>
-  <!-- Eyes -->
-  <circle cx="38" cy="43" r="12" fill="white"/>
-  <circle cx="62" cy="43" r="12" fill="white"/>
-  <!-- Pupils -->
-  <circle cx="40" cy="40.5" r="5.5" fill="#1a1a2e"/>
-  <circle cx="64" cy="40.5" r="5.5" fill="#1a1a2e"/>
-  <!-- Eye shine -->
-  <circle cx="43" cy="38" r="2.5" fill="white" opacity="0.9"/>
-  <circle cx="67" cy="38" r="2.5" fill="white" opacity="0.9"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Ink tile with the web-cell mark at its 32px weight. The inner ring stays so the mark never reads as a cube at tab size. -->
+  <rect width="32" height="32" rx="7" fill="#0B0D12"/>
+  <g transform="translate(4 4) scale(0.5)" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 19L24 4M28.33 21.5L41.32 14M28.33 26.5L41.32 34M24 29L24 44M19.67 26.5L6.68 34M19.67 21.5L6.68 14M24 13Q27.43 18.06 33.53 18.5Q30.86 24 33.53 29.5Q27.43 29.94 24 35Q20.57 29.94 14.47 29.5Q17.14 24 14.47 18.5Q20.57 18.06 24 13M24 4Q30.24 13.2 41.32 14Q36.47 24 41.32 34Q30.24 34.8 24 44Q17.76 34.8 6.68 34Q11.53 24 6.68 14Q17.76 13.2 24 4"/>
+    <circle cx="24" cy="24" r="3.4" fill="#FFFFFF" stroke="none"/>
+  </g>
 </svg>

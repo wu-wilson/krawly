@@ -1,17 +1,16 @@
 import rateLimit from 'express-rate-limit';
 
-/**
- * Create rate limiting middleware
- * @returns Configured rate limiter (default: 1000 req/min/IP, configurable via RATE_LIMIT_PER_MINUTE)
- */
-export const createRateLimiter = () => {
-  const maxRequests = parseInt(process.env.RATE_LIMIT_PER_MINUTE || '1000', 10);
+import { RATE_LIMIT_PER_MINUTE } from '../constants';
 
-  return rateLimit({
+/**
+ * Create rate limiting middleware allowing `RATE_LIMIT_PER_MINUTE` requests per IP per minute.
+ * @returns Configured rate limiter
+ */
+export const createRateLimiter = () =>
+  rateLimit({
     windowMs: 60 * 1000,
-    max: maxRequests,
+    limit: RATE_LIMIT_PER_MINUTE,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Rate limit exceeded. Try again in a minute.' },
   });
-};

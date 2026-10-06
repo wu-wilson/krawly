@@ -1,81 +1,81 @@
 /** Status of the overall crawl */
 export type CrawlStatus = 'idle' | 'crawling' | 'paused' | 'complete';
 
-/** Status of an individual node */
-export type NodeStatus = 'queued' | 'pending' | 'healthy' | 'redirect' | 'broken';
+/**
+ * Status of a node. `redirect` means the URL redirected before a successful response, or answered 3xx without a
+ * destination; `skipped` means the crawl was stopped before the node was checked.
+ */
+export type NodeStatus = 'queued' | 'pending' | 'healthy' | 'redirect' | 'broken' | 'skipped';
 
 /** Type of resource discovered */
-export type ResourceType = 'page' | 'script' | 'stylesheet' | 'image' | 'media' | 'font' | 'api' | 'other';
+export type ResourceType = 'page' | 'script' | 'stylesheet' | 'image' | 'media' | 'font' | 'other';
 
-/** A single crawled URL node */
+/** One redirect followed on the way to a URL's final response */
+export interface RedirectHop {
+  /** URL that answered with the redirect */
+  url: string;
+  /** Its 3xx status code */
+  status: number;
+}
+
+/** A single crawled URL */
 export interface CrawlNode {
-  /** Normalized URL — used as unique key */
+  /** Normalized URL, used as the unique key */
   id: string;
-  /** Original URL as discovered */
+  /** URL as linked, used for requests and display */
   url: string;
   /** Current status of this node */
   status: NodeStatus;
-  /** HTTP status code, null if not yet fetched */
+  /** Final HTTP status code; null until checked, 0 when no response was received */
   httpStatus: number | null;
-  /** Response time in ms, null if not yet fetched */
+  /** Response time in ms, null until checked */
   responseTime: number | null;
   /** Content-Type header value */
   contentType: string | null;
   /** Classified resource type */
   resourceType: ResourceType;
-  /** Crawl depth from the starting URL */
+  /** Clicks from the start page */
   depth: number;
-  /** Normalized URLs that link to this node */
+  /** Ids of the nodes that link here */
   inbound: string[];
-  /** Normalized URLs this node links to */
+  /** Ids of the URLs this page links to, including any left out at the URL limit */
   outbound: string[];
-  /** Chain of URLs if redirected */
-  redirectChain: string[];
-  /** Error message if the fetch failed */
+  /** Redirects followed before the final response, in order */
+  redirects: RedirectHop[];
+  /** Where the URL finally landed, when it redirected */
+  finalUrl: string | null;
+  /** Why no response was received */
   error: string | null;
   /** Response headers */
   headers: Record<string, string> | null;
-  /** ID of the parent node that discovered this one */
+  /** Id of the node whose page first linked here */
   parentId: string | null;
 }
 
 /** A directed edge between two nodes */
 export interface CrawlEdge {
-  /** Source node ID */
+  /** Source node id */
   source: string;
-  /** Target node ID */
+  /** Target node id */
   target: string;
   /** HTML element that created this link (e.g., "a", "script", "img") */
   sourceElement: string;
 }
 
-/** Engine configuration */
-export interface CrawlConfig {
-  /** Max concurrent requests */
-  maxConcurrent: number;
-  /** Max crawl depth */
-  maxDepth: number;
-  /** Max total URLs to crawl */
-  maxUrls: number;
-  /** Delay between request batches in ms */
-  batchDelay: number;
-}
-
-/** Response from the proxy /fetch endpoint */
-export interface ProxyFetchResponse {
+/** Response from the proxy's /fetch and /head endpoints */
+export interface ProxyResponse {
+  /** Final HTTP status, or 0 when no response was received */
   status: number;
+  /** Final response headers */
   headers: Record<string, string>;
+  /** Time across every hop, in ms */
   responseTime: number;
+  /** Decoded body of a 2xx HTML page; null for /head, error statuses, non-HTML responses, and failures */
   body: string | null;
+  /** URL that gave the final response, or null on failure */
   finalUrl: string | null;
-  error?: string;
-}
-
-/** Response from the proxy /head endpoint */
-export interface ProxyHeadResponse {
-  status: number;
-  headers: Record<string, string>;
-  responseTime: number;
-  finalUrl: string | null;
+  /** Redirects followed before the final response, in order */
+  redirects: RedirectHop[];
+  /** Why no response was received */
   error?: string;
 }
