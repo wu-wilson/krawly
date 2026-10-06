@@ -25,7 +25,7 @@ export interface ProxyFetchResult {
   body: string | null;
   /** URL that gave the final response, or null on failure */
   finalUrl: string | null;
-  /** Redirects followed before the final response, in order */
+  /** Redirects received, in order; when the cap is hit, the last one isn't followed */
   redirects: RedirectHop[];
   /** Why no response was received */
   error?: string;
@@ -36,7 +36,7 @@ export interface ProxyFetchOptions {
   /** Check status only, without reading the body */
   headOnly: boolean;
   /** Abandons the request early, such as when the client goes away */
-  signal?: AbortSignal;
+  signal: AbortSignal;
 }
 
 const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
@@ -61,8 +61,8 @@ export const proxyFetch = async (rawUrl: string, { headOnly, signal }: ProxyFetc
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const abandon = () => controller.abort();
-  if (signal?.aborted) abandon();
-  signal?.addEventListener('abort', abandon);
+  if (signal.aborted) abandon();
+  signal.addEventListener('abort', abandon);
 
   const request = (url: URL, method: 'GET' | 'HEAD'): Promise<Response> =>
     fetch(url, {
@@ -99,7 +99,7 @@ export const proxyFetch = async (rawUrl: string, { headOnly, signal }: ProxyFetc
         redirects.push({ url: current.toString(), status: response.status });
         // Past the last allowed hop, where the redirect points no longer matters.
         if (hop === MAX_REDIRECTS) break;
-        const next = new URL(location, current);
+        const next = new URL(decodeLocation(location), current);
         if (next.protocol !== 'http:' && next.protocol !== 'https:') return errorResult('Invalid redirect target');
         current = assertSafeUrl(next.toString());
         continue;
@@ -133,7 +133,7 @@ export const proxyFetch = async (rawUrl: string, { headOnly, signal }: ProxyFetc
     return errorResult(describeError(err));
   } finally {
     clearTimeout(timeout);
-    signal?.removeEventListener('abort', abandon);
+    signal.removeEventListener('abort', abandon);
   }
 };
 
@@ -208,3 +208,12 @@ const decoderFor = (contentType: string | null) => {
     return new TextDecoder();
   }
 };
+
+/**
+ * Read a Location header as browsers do. Header values arrive one byte per character, so a destination sent as raw
+ * UTF-8 (such as `/café`) is decoded back into the characters the server meant.
+ * @param location - The response's Location header
+ * @returns The destination, with any non-ASCII bytes read as UTF-8
+ */
+const decodeLocation = (location: string): string =>
+  /[\u0080-\u00ff]/.test(location) ? Buffer.from(location, 'latin1').toString('utf8') : location;

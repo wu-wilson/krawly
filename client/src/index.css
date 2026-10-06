@@ -81,7 +81,7 @@
 }
 
 /* Landing silk. Below 1132px each half fades out as it nears the demo window, so thread ends never show as
-   fragments in the narrow margins beside it. On phones the whole thing is drawn at 60%. */
+   fragments in the narrow margins beside it. On phones the whole thing is drawn at 60% scale. */
 @media (max-width: 1131.98px) {
   .silk-upper {
     -webkit-mask-image: linear-gradient(to bottom, #000 280px, transparent 340px);

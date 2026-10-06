@@ -104,11 +104,11 @@ export const DemoWindow: React.FC = () => {
     <div className={`relative mt-20 ${WINDOW_INSET}`}>
       <Silk />
       <p className="sr-only">{`${mapSummary(DEMO_HOST, summary)}, from a sample crawl.`}</p>
-      <div ref={windowRef} className="relative select-none overflow-hidden rounded-lg border border-line bg-surface shadow-window">
+      <div ref={windowRef} className="select-none overflow-hidden rounded-lg border border-line bg-surface shadow-window">
         <DemoChrome readout={readout} loaderRef={loaderRef} />
 
         <div ref={mapRef} className={`relative h-[clamp(340px,50vw,604px)] ${DOT_GRID}`}>
-          <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full" />
+          <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
           <ZoomControls className="absolute bottom-3.5 right-4" />
         </div>
       </div>

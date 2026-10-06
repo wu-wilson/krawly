@@ -65,8 +65,7 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className="flex h-svh flex-col overflow-hidden bg-surface pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-[13px]
-        leading-normal text-ink"
+      className="flex h-svh flex-col overflow-hidden bg-surface pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-[13px]"
     >
       <TopBar onHome={() => goHome()} />
       {!rootFailed && (
@@ -91,7 +90,7 @@ export const App: React.FC = () => {
             <div className={`absolute inset-0 ${view === 'graph' ? '' : 'invisible'}`}>
               <GraphView insetRight={insetRight} insetBottom={insetBottom} active={view === 'graph'} />
             </div>
-            <div className={`absolute inset-0 overflow-auto bg-surface pb-[env(safe-area-inset-bottom)] ${view === 'report' ? '' : 'invisible'}`}>
+            <div className={`absolute inset-0 overflow-auto pb-[env(safe-area-inset-bottom)] ${view === 'report' ? '' : 'invisible'}`}>
               <ReportView active={view === 'report'} onShowInGraph={handleShowInGraph} />
             </div>
             {/* Hidden rather than unmounted, so the details come back as they were when you return to the map. */}

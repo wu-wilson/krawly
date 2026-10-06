@@ -10,27 +10,21 @@ export const HTTP_SCHEME = /^https?:\/\//i;
 /**
  * Normalize a URL for deduplication: drop the fragment, tracking parameters, and a trailing slash, and sort the
  * remaining query parameters. (The URL parser already lowercases the host and drops default ports.)
- * @param url - Absolute URL to normalize
- * @returns Normalized URL, or the input unchanged when it isn't a parseable http(s) URL
+ * @param url - Absolute http(s) URL to normalize
+ * @returns Normalized URL
  */
 export const normalizeUrl = (url: string): string => {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return url;
+  const parsed = new URL(url);
+  parsed.hash = '';
+  const params = [...parsed.searchParams]
+    .filter(([key]) => !TRACKING_PARAMS.has(key))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  parsed.search = new URLSearchParams(params).toString();
 
-    parsed.hash = '';
-    const params = [...parsed.searchParams]
-      .filter(([key]) => !TRACKING_PARAMS.has(key))
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    parsed.search = new URLSearchParams(params).toString();
-
-    if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
-      parsed.pathname = parsed.pathname.slice(0, -1);
-    }
-    return parsed.toString();
-  } catch {
-    return url;
+  if (parsed.pathname.length > 1 && parsed.pathname.endsWith('/')) {
+    parsed.pathname = parsed.pathname.slice(0, -1);
   }
+  return parsed.toString();
 };
 
 /**

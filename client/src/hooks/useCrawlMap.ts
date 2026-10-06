@@ -105,7 +105,7 @@ export const useCrawlMap = ({ insetRight, insetBottom, scopeHost, active }: UseC
       const host = hostRef.current;
       const frame = scene.frame(now, {
         ...focusRef.current,
-        labelFor: (node: CrawlNode) => (node.parentId === null ? displayPath(node.url, host) : mapLabel(displayPath(node.url, host))),
+        labelFor: (node: CrawlNode) => mapLabel(displayPath(node.url, host)),
         labelSize: LABEL_PX / view.k,
       });
       drawFrame(ctx, frame, view, width, height, dpr);
@@ -270,8 +270,8 @@ export const useCrawlMap = ({ insetRight, insetBottom, scopeHost, active }: UseC
       draw(performance.now());
       requestDraw();
     } else {
-      // A fling left coasting would pick up again when the map comes back.
-      motion.stopCoasting();
+      // Settle any ease or fling now, so the map doesn't pick it up half-done when it comes back.
+      motion.jumpTo(motion.target());
       cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
       lastFrameRef.current = 0;

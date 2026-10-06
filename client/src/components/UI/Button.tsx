@@ -31,7 +31,7 @@ interface ButtonLinkProps extends ButtonLook, React.AnchorHTMLAttributes<HTMLAnc
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-ink text-surface hover:bg-ink-hover',
   secondary: 'bg-surface text-ink border border-line-strong hover:border-ink-3',
-  ghost: 'bg-transparent text-ink-2 hover:bg-wash-hover hover:text-ink',
+  ghost: 'text-ink-2 hover:bg-wash-hover hover:text-ink',
 };
 
 const SIZES: Record<ButtonSize, { box: string; square: string; icon: number }> = {
@@ -88,7 +88,7 @@ export const ButtonLink: React.FC<ButtonLinkProps> = ({ variant, size, icon, tra
 const lookClasses = ({ variant = 'primary', size = 'md' }: ButtonLook, children: React.ReactNode, className: string): string => {
   const spec = SIZES[size];
   const iconOnly = children === undefined || children === null || children === false;
-  return `inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-medium ${VARIANTS[variant]} ${spec.box}
+  return `inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium ${VARIANTS[variant]} ${spec.box}
     ${iconOnly ? spec.square : PADDING[size][variant]} ${HOVER_TRANSITION} ${FOCUS_RING} ${className}`;
 };
 

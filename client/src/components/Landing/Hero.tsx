@@ -7,8 +7,8 @@ import { UrlField } from './UrlField';
 interface HeroProps {
   /** Start a crawl of the given URL */
   onStartCrawl: (url: string) => void;
-  /** Address to start the field with */
-  initialAddress?: string;
+  /** Address to start the field with, if any */
+  initialAddress: string | undefined;
 }
 
 const SAMPLES = [
@@ -23,8 +23,8 @@ const SAMPLES = [
  * @returns Hero block
  */
 export const Hero: React.FC<HeroProps> = ({ onStartCrawl, initialAddress }) => (
-  <div className={`flex flex-col ${INSET}`}>
-    <h1 className="text-balance text-[clamp(32px,3.2vw,46px)] font-normal leading-[1.08] tracking-[-0.03em]">
+  <div className={INSET}>
+    <h1 className="text-balance text-[clamp(32px,3.2vw,46px)] leading-[1.08] tracking-[-0.03em]">
       <span className="block text-ink">Map any website in seconds.</span>
       <span className="block text-ink-4">See what’s broken before your users do.</span>
     </h1>
@@ -40,7 +40,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartCrawl, initialAddress }) => (
           <button
             type="button"
             onClick={() => onStartCrawl(sample.url)}
-            className={`cursor-pointer ${TEXT_LINK}`}
+            className={TEXT_LINK}
           >
             {sample.label}
           </button>

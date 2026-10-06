@@ -33,12 +33,12 @@ export const ReportList: React.FC<ReportListProps> = ({ rows, onOpen, selectedId
             onClick={() => onOpen(node.id)}
             title={node.url}
             aria-current={selected || undefined}
-            className={`block w-full cursor-pointer border-b border-line-soft px-4 py-[11px] sm:px-5 text-left tabular-nums
+            className={`block w-full border-b border-line-soft px-4 py-[11px] sm:px-5 tabular-nums
               ${rowBackground(selected)} ${HOVER_TRANSITION} ${FOCUS_RING_INSET}`}
           >
             <span className="flex justify-between gap-3 text-sm">
               <span className="truncate font-medium text-ink">{path}</span>
-              <span className={`flex-none font-medium ${TONE_CLASS[status.tone]}`}>{status.code ?? ''}</span>
+              <span className={`font-medium ${TONE_CLASS[status.tone]}`}>{status.code ?? ''}</span>
             </span>
             <span className="mt-px flex justify-between gap-3 text-[12.5px] text-ink-3">
               {/* A failed request has no code, so its reason carries the tone instead. */}

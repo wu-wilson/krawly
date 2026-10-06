@@ -52,12 +52,12 @@ export const ReportTable: React.FC<ReportTableProps> = ({ rows, sort, onSort, on
               key={column.field}
               role="columnheader"
               aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-              className={column.align === 'end' ? 'justify-self-end' : 'justify-self-start'}
+              className={column.align === 'end' ? 'justify-self-end' : undefined}
             >
               <button
                 type="button"
                 onClick={() => onSort(column.field)}
-                className={`flex cursor-pointer items-center gap-1 rounded-sm coarse:h-8 ${active ? 'text-ink' : 'hover:text-ink'} ${HOVER_TRANSITION} ${FOCUS_RING}`}
+                className={`flex items-center gap-1 rounded-sm coarse:h-8 ${active ? 'text-ink hover:text-ink-2' : 'hover:text-ink'} ${HOVER_TRANSITION} ${FOCUS_RING}`}
               >
                 {column.label}
                 {active && <Icon name="chevron" size={11} className={sort.dir === 'desc' ? 'rotate-180' : ''} />}
@@ -79,12 +79,12 @@ export const ReportTable: React.FC<ReportTableProps> = ({ rows, sort, onSort, on
             className={`${GRID} relative h-10 border-b border-line-soft text-[12.5px] tabular-nums text-ink
               ${rowBackground(selected)} ${HOVER_TRANSITION} ${ROW_FOCUS}`}
           >
-            <span role="cell" className="min-w-0">
+            <span role="cell">
               <button
                 type="button"
                 onClick={() => onOpen(node.id)}
                 title={node.url}
-                className="block w-full scroll-mt-9 cursor-pointer truncate text-left font-medium leading-10 outline-none after:absolute after:inset-0
+                className="block w-full scroll-mt-9 truncate text-left font-medium leading-10 outline-none after:absolute after:inset-0
                   after:content-[''] coarse:scroll-mt-11"
               >
                 {path}

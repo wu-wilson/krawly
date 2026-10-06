@@ -19,7 +19,7 @@ interface MenuProps {
     /** Visible label; leave out for an icon button */
     label?: string;
     /** Icon before the label, or on its own */
-    icon?: IconName;
+    icon: IconName;
     /** Accessible name, required when there's no label */
     ariaLabel?: string;
     /** `md` in toolbars, `touch` for phones */
@@ -133,7 +133,7 @@ export const Menu: React.FC<MenuProps> = ({ trigger, items, className = '' }) =>
                 close(true);
                 item.onSelect();
               }}
-              className={`flex h-8 w-full cursor-pointer items-center whitespace-nowrap rounded-[5px] px-2.5 text-left text-[13px] text-ink-2 max-sm:h-11
+              className={`flex h-8 w-full items-center whitespace-nowrap rounded-[5px] px-2.5 text-[13px] text-ink-2 max-sm:h-11
                 hover:bg-wash-hover hover:text-ink focus-visible:bg-wash-hover ${HOVER_TRANSITION} ${FOCUS_RING_INSET}`}
             >
               {item.label}

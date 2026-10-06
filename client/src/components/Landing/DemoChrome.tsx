@@ -34,7 +34,7 @@ export const DemoChrome: React.FC<DemoChromeProps> = ({ readout, loaderRef }) =>
     <>
       <div className="relative flex h-11 items-center justify-between gap-4 border-b border-line px-4">
         <span ref={loaderRef} aria-hidden="true" className="loader-sweep absolute inset-x-0 -bottom-px h-0.5 opacity-0" />
-        <div className="flex min-w-0 items-baseline gap-3 whitespace-nowrap">
+        <div className="flex min-w-0 items-baseline gap-3">
           <span className="text-[12.5px] font-semibold tracking-[-0.01em] text-ink">{DEMO_HOST}</span>
           <span className="truncate text-xs tabular-nums text-ink-3">{statusLine}</span>
         </div>

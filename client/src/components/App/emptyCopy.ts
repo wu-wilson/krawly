@@ -1,5 +1,5 @@
 import { SLOW_RESPONSE_MS } from '../../engine/limits';
-import { describeFailure, describeStatus, plural } from '../../engine/statusText';
+import { describeFailure, describeStatus, explainFailure, plural } from '../../engine/statusText';
 import { TYPE_NOUNS } from './options';
 
 import type { CrawlNode } from '../../engine/types';
@@ -67,7 +67,7 @@ export const rootFailedCopy = (root: CrawlNode, host: string): EmptyCopy => {
       body: 'Krawly couldn’t read any links on the start page, so there’s nothing to map. Check the address, or try again in a moment.',
     };
   }
-  const failure = describeFailure(root.error);
-  if (failure.proxy) return { title: `Krawly couldn’t check ${host}`, body: `${failure.explanation} Try again in a moment.` };
-  return { title: `Krawly couldn’t reach ${host}`, body: `${failure.explanation} Check the address, or try again in a moment.` };
+  const explanation = explainFailure(root);
+  if (describeFailure(root.error).proxy) return { title: `Krawly couldn’t check ${host}`, body: `${explanation} Try again in a moment.` };
+  return { title: `Krawly couldn’t reach ${host}`, body: `${explanation} Check the address, or try again in a moment.` };
 };

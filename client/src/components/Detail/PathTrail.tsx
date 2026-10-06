@@ -39,7 +39,7 @@ export const PathTrail: React.FC<PathTrailProps> = ({ node, scopeHost, touch }) 
   const selectNode = useCrawlStore((s) => s.selectNode);
 
   return (
-    <ol className="flex flex-col">
+    <ol>
       {trail.map((step, i) => {
         const last = i === trail.length - 1;
         return (
@@ -58,7 +58,7 @@ export const PathTrail: React.FC<PathTrailProps> = ({ node, scopeHost, touch }) 
                 type="button"
                 onClick={() => selectNode(step.id)}
                 title={step.url}
-                className={`h-full min-w-0 flex-1 cursor-pointer truncate rounded-sm text-left text-ink-2 hover:text-ink ${HOVER_TRANSITION} ${FOCUS_RING}`}
+                className={`h-full flex-1 truncate rounded-sm text-left text-ink-2 hover:text-ink ${HOVER_TRANSITION} ${FOCUS_RING}`}
               >
                 {displayPath(step.url, scopeHost)}
               </button>

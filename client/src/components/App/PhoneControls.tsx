@@ -45,7 +45,7 @@ export const PhoneControls: React.FC = () => {
         />
       </div>
       {hiddenFilters && (
-        <div className="flex items-center justify-between gap-3 border-b border-line bg-wash-row pl-4 pr-1 text-[13px] text-ink-2">
+        <div className="flex items-center justify-between gap-3 border-b border-line bg-wash-row py-1 pl-4 pr-1 text-[13px] text-ink-2">
           <span className="truncate">{search ? `Showing ${shown} matching “${search}”` : `Showing ${shown} only`}</span>
           <Button variant="ghost" size="touch" onClick={handleClear}>
             Clear

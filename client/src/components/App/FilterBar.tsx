@@ -57,7 +57,6 @@ export const FilterBar: React.FC = () => {
           options={TYPE_OPTIONS}
           value={filter.typeFilter}
           onChange={(typeFilter) => setFilter({ typeFilter })}
-          className="flex-none"
         />
       </div>
       <SearchField

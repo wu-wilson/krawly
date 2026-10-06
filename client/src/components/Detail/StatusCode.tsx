@@ -9,10 +9,10 @@ interface StatusCodeProps {
   reason: string;
   /** Colors the code, or the reason when there's no code */
   tone: StatusTone;
-  /** Response time to show at the far end, in ms */
-  ms?: number | null;
+  /** Response time to show at the far end in ms, or null to leave it out */
+  ms: number | null;
   /** `lg` for the detail panel header, `md` for the sheet */
-  size?: 'lg' | 'md';
+  size: 'lg' | 'md';
 }
 
 /** Text color for each status tone */
@@ -25,10 +25,10 @@ export const TONE_CLASS: Record<StatusTone, string> = {
 
 /**
  * A status code in its tone, followed by the reason in ink. With no code, the reason itself carries the tone.
- * @param props - Code, reason, tone, and optional timing
+ * @param props - Code, reason, tone, timing (or null), and size
  * @returns Status line
  */
-export const StatusCode: React.FC<StatusCodeProps> = ({ code, reason, tone, ms, size = 'lg' }) => (
+export const StatusCode: React.FC<StatusCodeProps> = ({ code, reason, tone, ms, size }) => (
   <div className="flex items-baseline gap-2.5">
     {code !== null ? (
       <>
@@ -40,7 +40,7 @@ export const StatusCode: React.FC<StatusCodeProps> = ({ code, reason, tone, ms, 
     ) : (
       <span className={`text-[15px] font-semibold tracking-[-0.01em] ${TONE_CLASS[tone]}`}>{reason}</span>
     )}
-    {ms !== null && ms !== undefined && (
+    {ms !== null && (
       <span className="ml-auto whitespace-nowrap text-[12.5px] tabular-nums text-ink-3">{ms} ms</span>
     )}
   </div>

@@ -10,11 +10,11 @@ interface SearchFieldProps {
   /** Placeholder and accessible name */
   placeholder: string;
   /** Key shown as a shortcut hint at the end of the field */
-  shortcut?: string;
+  shortcut: string;
   /** `sm` for the landing demo, `md` for the app */
   size?: 'sm' | 'md';
   /** Additional classes, typically a width */
-  className?: string;
+  className: string;
 }
 
 /**
@@ -23,7 +23,7 @@ interface SearchFieldProps {
  * @returns Search field
  */
 export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
-  ({ value, onChange, placeholder, shortcut, size = 'sm', className = '' }, ref) => (
+  ({ value, onChange, placeholder, shortcut, size = 'sm', className }, ref) => (
     <label
       className={`flex items-center gap-2 rounded-md border border-transparent bg-wash-well pl-2.5 pr-[5px] text-ink-3
         focus-within:border-ink focus-within:bg-surface focus-within:shadow-focus hover:[&:not(:focus-within)]:border-line-strong
@@ -39,16 +39,14 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         placeholder={placeholder}
         aria-label={placeholder}
         aria-keyshortcuts={shortcut}
-        className={`min-w-0 flex-1 border-0 bg-transparent p-0 text-ink outline-none placeholder:text-ink-3
+        className={`min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-3
           ${size === 'md' ? 'text-[12.5px]' : 'text-xs'}`}
       />
-      {shortcut && (
-        <kbd
-          className={`rounded border border-line bg-surface px-[5px] font-sans leading-4 text-ink-3 ${size === 'md' ? 'text-[10.5px]' : 'text-[10px]'}`}
-        >
-          {shortcut}
-        </kbd>
-      )}
+      <kbd
+        className={`rounded border border-line bg-surface px-[5px] font-sans leading-4 text-ink-3 ${size === 'md' ? 'text-[10.5px]' : 'text-[10px]'}`}
+      >
+        {shortcut}
+      </kbd>
     </label>
   ),
 );

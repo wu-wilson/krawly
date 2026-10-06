@@ -11,7 +11,7 @@ interface FilterTab<T extends string> {
   /** Number of results this filter would show */
   count: number;
   /** Draws the count in the broken color when it's above zero */
-  alarm?: boolean;
+  alarm: boolean;
   /** Additional classes, for example to hide a tab on phones */
   className?: string;
 }
@@ -50,7 +50,7 @@ export const FilterTabs = <T extends string>({
           type="button"
           aria-pressed={active}
           onClick={() => onChange?.(tab.value)}
-          className={`flex cursor-pointer items-baseline gap-1.5 whitespace-nowrap rounded-sm font-medium ${HOVER_TRANSITION} ${FOCUS_RING}
+          className={`flex items-baseline gap-1.5 whitespace-nowrap rounded-sm font-medium ${HOVER_TRANSITION} ${FOCUS_RING}
             ${size === 'md' ? 'text-[12.5px] coarse:py-1.5' : 'text-xs'} ${active ? 'text-ink' : 'text-ink-3 hover:text-ink'} ${tab.className ?? ''}`}
         >
           {tab.label}

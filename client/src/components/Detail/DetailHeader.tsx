@@ -50,13 +50,13 @@ export const DetailHeader: React.FC<DetailHeaderProps> = ({ node, scopeHost, lay
           iconSize={touch ? 16 : 13}
           aria-label="Close details"
           onClick={onClose}
-          className={`flex-none ${closeOffset}`}
+          className={closeOffset}
         />
       </div>
       <div className={sheet ? 'mt-3' : 'mt-4'}>
         <StatusCode code={status.code} reason={status.reason} tone={status.tone} ms={responseMs(node)} size={sheet ? 'md' : 'lg'} />
       </div>
-      <p className={`mt-3 leading-normal text-ink-2 ${sheet ? 'text-[13px]' : 'text-[12.5px]'}`}>{explainNode(node, scopeHost)}</p>
+      <p className={`mt-3 text-ink-2 ${sheet ? 'text-[13px]' : 'text-[12.5px]'}`}>{explainNode(node, scopeHost)}</p>
     </div>
   );
 };

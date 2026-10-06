@@ -22,8 +22,6 @@ interface SelectProps<T extends string> {
   label: string;
   /** `quiet` sits flush in a toolbar; `boxed` has a border, for phones */
   variant?: 'quiet' | 'boxed';
-  /** Additional classes for the wrapper */
-  className?: string;
 }
 
 /**
@@ -37,12 +35,11 @@ export const Select = <T extends string>({
   onChange,
   label,
   variant = 'quiet',
-  className = '',
 }: SelectProps<T>): React.ReactElement => {
   const boxed = variant === 'boxed';
 
   return (
-    <label className={`relative flex items-center ${className}`}>
+    <label className="relative flex items-center">
       <span className="sr-only">{label}</span>
       <select
         value={value}
@@ -53,7 +50,7 @@ export const Select = <T extends string>({
         className={`cursor-pointer appearance-none font-medium tabular-nums ${HOVER_TRANSITION} ${FOCUS_RING}
           ${boxed
             ? 'h-[34px] rounded-[7px] border border-line-strong bg-surface pl-2.5 pr-[26px] text-[13px] text-ink hover:border-ink-3'
-            : 'h-[26px] rounded-md border-0 bg-transparent pl-2 pr-[22px] text-[12.5px] text-ink-2 hover:bg-wash-hover coarse:h-[30px]'}`}
+            : 'h-[26px] rounded-md bg-transparent pl-2 pr-[22px] text-[12.5px] text-ink-2 hover:bg-wash-hover coarse:h-[30px]'}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

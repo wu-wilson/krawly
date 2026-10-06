@@ -26,7 +26,7 @@ export const Disclosure: React.FC<DisclosureProps> = ({ title, children }) => {
         aria-expanded={open}
         aria-controls={open ? contentId : undefined}
         onClick={() => setOpen((v) => !v)}
-        className={`flex h-[34px] cursor-pointer items-center justify-between text-[12.5px] font-medium text-ink-2 ${BLEED_ROW}
+        className={`flex h-[34px] items-center justify-between text-[12.5px] font-medium text-ink-2 ${BLEED_ROW}
           ${HOVER_TRANSITION} ${FOCUS_RING}`}
       >
         {title}

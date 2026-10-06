@@ -2,8 +2,8 @@
 export type CrawlStatus = 'idle' | 'crawling' | 'paused' | 'complete';
 
 /**
- * Status of a node. `redirect` means the URL redirected before a successful response, or answered 3xx without a
- * destination; `skipped` means the crawl was stopped before the node was checked.
+ * Status of a node. `redirect` means the URL redirected before a successful response, or answered a 3xx the proxy
+ * doesn't follow (no destination, or a 300 or 304); `skipped` means the crawl was stopped before the node was checked.
  */
 export type NodeStatus = 'queued' | 'pending' | 'healthy' | 'redirect' | 'broken' | 'skipped';
 
@@ -40,7 +40,7 @@ export interface CrawlNode {
   inbound: string[];
   /** Ids of the URLs this page links to, including any left out at the URL limit */
   outbound: string[];
-  /** Redirects followed before the final response, in order */
+  /** Redirects received, in order; when the cap is hit, the last one isn't followed */
   redirects: RedirectHop[];
   /** Where the URL finally landed, when it redirected */
   finalUrl: string | null;
@@ -70,11 +70,11 @@ export interface ProxyResponse {
   headers: Record<string, string>;
   /** Time across every hop, in ms */
   responseTime: number;
-  /** Decoded body of a 2xx HTML page; null for /head, error statuses, non-HTML responses, and failures */
+  /** Decoded body of a 2xx HTML page; null for /head, non-2xx statuses, non-HTML responses, and failures */
   body: string | null;
   /** URL that gave the final response, or null on failure */
   finalUrl: string | null;
-  /** Redirects followed before the final response, in order */
+  /** Redirects received, in order; when the cap is hit, the last one isn't followed */
   redirects: RedirectHop[];
   /** Why no response was received */
   error?: string;

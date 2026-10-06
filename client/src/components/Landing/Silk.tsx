@@ -80,7 +80,7 @@ const SilkHalf: React.FC<SilkHalfProps> = ({ half, pathRefs, initial }) => {
       viewBox={upper ? '-1140 -340 1460 740' : '-320 -400 1460 740'}
       width="1460"
       height="740"
-      className={`pointer-events-none absolute z-[-1] block ${upper ? 'silk-upper -right-[320px] -top-[340px]' : 'silk-lower -bottom-[340px] -left-[320px]'}`}
+      className={`absolute z-[-1] ${upper ? 'silk-upper -right-[320px] -top-[340px]' : 'silk-lower -bottom-[340px] -left-[320px]'}`}
     >
       <defs>
         <linearGradient id={`${id}-color`} gradientUnits="userSpaceOnUse" x1={upper ? -760 : 760} y1="0" x2={upper ? 120 : -120} y2="0">

@@ -8,9 +8,9 @@ interface UrlFieldProps {
   /** Called with a full http(s) URL once the address passes validation; https is added when no scheme is typed */
   onSubmit: (url: string) => void;
   /** Address to start the field with, selected for editing after a failed crawl */
-  initialValue?: string;
+  initialValue: string | undefined;
   /** Additional classes, typically spacing and width */
-  className?: string;
+  className: string;
 }
 
 const INVALID_MESSAGE = 'That doesn’t look like a web address. Try something like example.com.';
@@ -21,7 +21,7 @@ const INVALID_MESSAGE = 'That doesn’t look like a web address. Try something l
  * @param props - Submit handler, initial address, and classes
  * @returns Address form
  */
-export const UrlField: React.FC<UrlFieldProps> = ({ onSubmit, initialValue, className = '' }) => {
+export const UrlField: React.FC<UrlFieldProps> = ({ onSubmit, initialValue, className }) => {
   const [value, setValue] = useState(initialValue ?? '');
   const [error, setError] = useState<string | null>(null);
   // Counts failed submits, so the same error is announced again each time.
@@ -98,7 +98,7 @@ export const UrlField: React.FC<UrlFieldProps> = ({ onSubmit, initialValue, clas
           spellCheck={false}
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
-          className="m-0 min-w-0 flex-1 border-0 bg-transparent p-0 text-[14.5px] text-ink outline-none placeholder:text-ink-3"
+          className="min-w-0 flex-1 bg-transparent text-[14.5px] text-ink outline-none placeholder:text-ink-3"
         />
         <Button type="submit" size="xl" trailingIcon="arrowRight" className="ml-2.5 max-sm:h-11">
           Crawl site

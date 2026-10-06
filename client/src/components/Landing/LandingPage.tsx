@@ -13,7 +13,7 @@ interface LandingPageProps {
   /** Whether the page is transitioning out */
   isTransitioning: boolean;
   /** Address to start the field with, for "Change address" after a failed crawl */
-  initialAddress?: string;
+  initialAddress: string | undefined;
 }
 
 /**
@@ -24,12 +24,12 @@ interface LandingPageProps {
  */
 export const LandingPage: React.FC<LandingPageProps> = ({ onStartCrawl, isTransitioning, initialAddress }) => (
   <div
-    className={`relative min-h-dvh overflow-hidden bg-ground pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-[15px]
-      leading-normal text-ink transition-opacity duration-200 ease-quart ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
+    className={`min-h-dvh overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]
+      transition-opacity duration-200 ease-quart ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}
   >
     <SiteHeader />
     <main>
-      <section className="relative z-[1]">
+      <section>
         <div className={`${COLUMN} relative z-[1] pt-20`}>
           <Hero onStartCrawl={onStartCrawl} initialAddress={initialAddress} />
           <DemoWindow />

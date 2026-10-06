@@ -15,7 +15,7 @@ interface ZoomControlsProps {
   /** `sm` for a mouse, `touch` for 44px buttons on touch screens */
   size?: 'sm' | 'touch';
   /** Additional classes, typically for positioning */
-  className?: string;
+  className: string;
   /** Offsets that depend on open panels */
   style?: React.CSSProperties;
 }
@@ -30,7 +30,7 @@ const SIZES = {
  * @param props - Zoom handlers, size, positioning classes, and offsets
  * @returns Zoom button group
  */
-export const ZoomControls: React.FC<ZoomControlsProps> = ({ onZoomOut, onZoomIn, onFit, size = 'sm', className = '', style }) => {
+export const ZoomControls: React.FC<ZoomControlsProps> = ({ onZoomOut, onZoomIn, onFit, size = 'sm', className, style }) => {
   const spec = SIZES[size];
   const buttons: Array<{ label: string; icon: IconName; onClick?: () => void }> = [
     { label: 'Zoom out', icon: 'minus', onClick: onZoomOut },
@@ -39,14 +39,14 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({ onZoomOut, onZoomIn,
   ];
 
   return (
-    <div role="group" aria-label="Zoom" style={style} className={`flex divide-x divide-line overflow-hidden border border-line bg-surface ${spec.group} ${className}`}>
+    <div role="group" aria-label="Zoom" style={style} className={`flex divide-x divide-line overflow-hidden border border-line ${spec.group} ${className}`}>
       {buttons.map((button) => (
         <button
           key={button.label}
           type="button"
           aria-label={button.label}
           onClick={button.onClick}
-          className={`grid cursor-pointer place-items-center bg-surface text-ink-2 hover:bg-wash-hover hover:text-ink ${spec.button}
+          className={`grid place-items-center bg-surface text-ink-2 hover:bg-wash-hover hover:text-ink ${spec.button}
             ${HOVER_TRANSITION} ${FOCUS_RING_INSET}`}
         >
           <Icon name={button.icon} size={spec.icon} />

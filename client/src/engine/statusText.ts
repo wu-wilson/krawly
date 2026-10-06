@@ -93,12 +93,25 @@ interface FailureCopy {
   explanation: string;
   /** True when Krawly's own proxy failed, rather than the site */
   proxy?: boolean;
+  /** True when the redirect itself was the problem, rather than where it pointed */
+  redirect?: boolean;
 }
+
+/**
+ * Explain why a node got no HTTP response. The proxy keeps the redirects it met, so a failure after one, other than the
+ * redirect's own, happened where the redirect pointed.
+ * @param node - A node whose request failed
+ * @returns One sentence
+ */
+export const explainFailure = (node: CrawlNode): string => {
+  const failure = describeFailure(node.error);
+  return node.redirects.length > 0 && !failure.redirect ? 'This address redirects somewhere Krawly couldn’t reach.' : failure.explanation;
+};
 
 /**
  * Describe a request that got no HTTP response in plain language, keyed off the error the proxy or crawler recorded.
  * @param error - Error message recorded on the node
- * @returns A short reason, a one-sentence explanation, and whether Krawly's proxy was at fault
+ * @returns A short reason, a one-sentence explanation, and whether Krawly's proxy or the redirect itself was at fault
  */
 export const describeFailure = (error: string | null): FailureCopy => {
   const message = (error ?? '').toLowerCase();
@@ -110,13 +123,28 @@ export const describeFailure = (error: string | null): FailureCopy => {
     return { reason: 'Unknown host', explanation: 'This address doesn’t exist, so Krawly couldn’t reach it.' };
   }
   if (message.includes('blocked range')) {
-    return { reason: 'Private address', explanation: 'Krawly only checks public sites, so it skipped this private address.' };
+    return { reason: 'Private address', explanation: 'Krawly only checks public sites, so it didn’t connect to this private address.' };
   }
   if (message.includes('too many redirects')) {
-    return { reason: 'Too many redirects', explanation: `This address redirects more than ${CRAWL_LIMITS.maxRedirects} times, so Krawly stopped following it.` };
+    return {
+      reason: 'Too many redirects',
+      explanation: `This address redirects more than ${CRAWL_LIMITS.maxRedirects} times, so Krawly stopped following it.`,
+      redirect: true,
+    };
+  }
+  if (message.includes('credentials')) {
+    return {
+      reason: 'Bad redirect',
+      explanation: 'This address redirects to one with a username or password, which Krawly doesn’t follow.',
+      redirect: true,
+    };
   }
   if (message.includes('invalid redirect')) {
-    return { reason: 'Bad redirect', explanation: 'This address redirects somewhere that isn’t a valid web address.' };
+    return {
+      reason: 'Bad redirect',
+      explanation: 'This address redirects somewhere that isn’t a valid web address.',
+      redirect: true,
+    };
   }
   if (message.includes('rate limit')) {
     return { reason: 'Rate limited', explanation: 'Krawly’s proxy is busy, so this page wasn’t checked.', proxy: true };
@@ -180,10 +208,10 @@ export const responseMs = (node: CrawlNode): number | null => (node.httpStatus ?
  * @returns Explanation
  */
 export const explainNode = (node: CrawlNode, scopeHost: string): string => {
-  if (node.status === 'queued') return 'This page is waiting for a free request slot.';
+  if (node.status === 'queued') return 'This page is waiting its turn to be checked.';
   if (node.status === 'pending') return 'Krawly is checking this page now.';
   if (node.status === 'skipped') return 'The crawl was stopped before Krawly checked this page.';
-  if (!node.httpStatus) return describeFailure(node.error).explanation;
+  if (!node.httpStatus) return explainFailure(node);
 
   const isPage = node.resourceType === 'page';
   const external = hostOf(node.url) !== scopeHost;
@@ -196,9 +224,11 @@ export const explainNode = (node: CrawlNode, scopeHost: string): string => {
   } else if (node.status === 'redirect') {
     const hops = node.redirects.length;
     const target = node.finalUrl ? displayPath(node.finalUrl, scopeHost) : 'another address';
-    // A 3xx without a destination counts as a redirect, though it led nowhere.
-    if (hops === 0) sentence = 'This address answered with a redirect but didn’t say where to go.';
-    else sentence = hops > 1 ? `This address redirects ${hops} times before landing on ${target}.` : `This address redirects to ${target}.`;
+    // A 3xx the proxy didn't follow counts as a redirect, though it led nowhere.
+    if (hops > 1) sentence = `This address redirects ${hops} times before landing on ${target}.`;
+    else if (hops === 1) sentence = `This address redirects to ${target}.`;
+    else if (node.headers?.location) sentence = 'This address answered with a redirect that Krawly doesn’t follow.';
+    else sentence = 'This address answered with a redirect but didn’t say where to go.';
   } else if (!isPage) {
     sentence = 'Krawly checked that this file loads. It doesn’t read files for links.';
   } else if (external) {
@@ -272,8 +302,8 @@ export const crawlAnnouncement = (status: CrawlStatus, host: string, finished: s
 export const mapSummary = (host: string, counts: { total: number; broken: number; redirects: number }): string =>
   `Crawl map of ${host} with ${plural(counts.total, 'page')}, ${counts.broken} broken and ${counts.redirects} redirecting`;
 
-/** The page-limit note: the crawl stopped at its limit, and pages further out weren't checked */
-export const LIMIT_SENTENCE = `Krawly stopped at ${CRAWL_LIMITS.maxUrls} pages, its limit for one crawl. Pages further from your start page weren’t checked.`;
+/** The page-limit note: one crawl checks at most `maxUrls` pages, so pages further out aren't included */
+export const LIMIT_SENTENCE = `Krawly checks up to ${CRAWL_LIMITS.maxUrls} pages in one crawl, so pages further from your start page aren’t included.`;
 
 /**
  * Describe where a crawl stands in one plain sentence, such as "Crawled 46 pages in 4.0 seconds".
@@ -295,13 +325,13 @@ const MAX_LABEL_CHARS = 28;
 /**
  * Shorten a display path into a map label that fits beside a page: long paths keep only their last segment.
  * @param path - Display path from `displayPath`
- * @returns The path, or "…/last-segment" trimmed to fit
+ * @returns The path, or "…/last-segment" when it has more than one, trimmed to fit
  */
 export const mapLabel = (path: string): string => {
   if (path.length <= MAX_LABEL_CHARS) return path;
   const segments = path.split('/').filter(Boolean);
-  const last = segments[segments.length - 1] ?? path;
-  const short = `…/${last}`;
+  // A path with nothing before its last segment is trimmed as is, rather than marked as shortened.
+  const short = segments.length > 1 ? `…/${segments[segments.length - 1]}` : path;
   return short.length <= MAX_LABEL_CHARS ? short : `${short.slice(0, MAX_LABEL_CHARS - 1)}…`;
 };
 

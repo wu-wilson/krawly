@@ -42,14 +42,14 @@ export const GraphView: React.FC<GraphViewProps> = ({ insetRight, insetBottom, a
   const bottom = insetBottom > 0 ? `calc(${covered} + 16px)` : 'max(16px, env(safe-area-inset-bottom))';
 
   return (
-    <div ref={map.containerRef} className="relative h-full w-full overflow-hidden bg-canvas">
+    <div ref={map.containerRef} className="relative h-full overflow-hidden bg-canvas">
       <canvas
         ref={map.canvasRef}
         role="img"
         aria-label={mapSummary(host, stats)}
         {...map.pointerHandlers}
         onContextMenu={(e) => e.preventDefault()}
-        className={`absolute inset-0 block h-full w-full touch-none select-none [-webkit-touch-callout:none]
+        className={`absolute inset-0 h-full w-full touch-none select-none [-webkit-touch-callout:none]
           ${map.hovering ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'}`}
       />
       {/* With nothing to show, the empty state takes the map's place on the same dotted canvas, centred in the part
@@ -64,7 +64,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ insetRight, insetBottom, a
           onZoomIn={map.zoomIn}
           onFit={map.fit}
           size={touch ? 'touch' : 'sm'}
-          className="absolute right-4 z-10 transition-[bottom,transform] duration-300 ease-quart"
+          className="absolute right-4 transition-[bottom,transform] duration-300 ease-quart"
           style={{ bottom, transform: `translateX(${-insetRight}px)` }}
         />
       )}

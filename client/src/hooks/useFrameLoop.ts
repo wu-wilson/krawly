@@ -4,7 +4,7 @@ import { MAX_STEP_MS } from '../render/motion';
 
 interface FrameLoopOptions {
   /** Run the loop only while true */
-  enabled?: boolean;
+  enabled: boolean;
   /** Skip frames that arrive sooner than this, to cap the frame rate */
   minFrameMs?: number;
   /** Grows the viewport's box when checking visibility, so content drawn past the target still counts as on screen (CSS margin syntax) */
@@ -21,7 +21,7 @@ interface FrameLoopOptions {
 export const useFrameLoop = (
   targetRef: React.RefObject<Element | null>,
   onFrame: (stepMs: number) => void,
-  { enabled = true, minFrameMs = 0, rootMargin = '0px' }: FrameLoopOptions = {},
+  { enabled, minFrameMs = 0, rootMargin = '0px' }: FrameLoopOptions,
 ): void => {
   const onFrameRef = useRef(onFrame);
 
@@ -55,9 +55,10 @@ export const useFrameLoop = (
       raf = 0;
     };
 
+    // Entries can queue up between callbacks, so only the latest reflects where the element is now.
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) start();
+      (entries) => {
+        if (entries[entries.length - 1].isIntersecting) start();
         else stop();
       },
       { rootMargin },

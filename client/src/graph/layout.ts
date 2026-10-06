@@ -123,7 +123,7 @@ export const layoutRadialTree = (nodes: Iterable<LayoutNode>, stretchX: number):
 
   const bounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   for (const [id, { angle, depth }] of angles) {
-    const r = radii[depth] ?? 0;
+    const r = radii[depth];
     const x = Math.cos(angle) * r * stretchX;
     const y = Math.sin(angle) * r;
     points.set(id, { x, y, angle, depth });

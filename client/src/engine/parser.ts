@@ -69,8 +69,8 @@ export const parseLinks = (html: string, baseUrl: string): ParsedLink[] => {
 
   const add = (rawUrl: string | null | undefined, element: string, resourceType: ResourceType) => {
     const trimmed = rawUrl?.trim();
-    // Fragment-only links point back at the same page.
-    if (!trimmed || trimmed.startsWith('#')) return;
+    // Without a <base>, a fragment-only link points back at the same page.
+    if (!trimmed || (trimmed.startsWith('#') && base === baseUrl)) return;
 
     let resolved: URL;
     try {
@@ -80,7 +80,7 @@ export const parseLinks = (html: string, baseUrl: string): ParsedLink[] => {
       return;
     }
     if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return;
-    // A link carrying a username or password can't be fetched, so it isn't followed.
+    // A link carrying a username or password can't be fetched, so it's left out.
     if (resolved.username || resolved.password) return;
 
     resolved.hash = '';
@@ -121,9 +121,11 @@ export const parseLinks = (html: string, baseUrl: string): ParsedLink[] => {
     srcsetUrls(el.getAttribute('srcset') ?? '').forEach((url) => add(url, 'source', 'image'));
   });
 
+  // A refresh reads as a delay, then the target, optionally prefixed with "url=". A quoted target ends at its
+  // closing quote, as browsers read it.
   doc.querySelectorAll('meta[http-equiv="refresh" i]').forEach((el) => {
-    const match = (el.getAttribute('content') ?? '').match(/url=(.+)/i);
-    if (match) add(match[1].trim().replace(/^['"]|['"]$/g, ''), 'meta', 'page');
+    const match = (el.getAttribute('content') ?? '').match(/^\s*[\d.]+\s*[;,\s]\s*(?:url\s*=\s*)?(['"]?)(.*)/is);
+    if (match) add(match[1] ? match[2].split(match[1])[0] : match[2], 'meta', 'page');
   });
 
   return links;

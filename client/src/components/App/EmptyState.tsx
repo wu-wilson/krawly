@@ -35,8 +35,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ title, body, actions, cl
     // Centred with auto margins, so content taller than a short map scrolls instead of being cut at both ends.
     <div ref={rootRef} className={`absolute inset-0 z-10 flex overflow-y-auto p-6 text-center ${className}`}>
       <div className="m-auto flex flex-col items-center gap-2">
-        <h2 className="max-w-full text-[15px] font-semibold tracking-[-0.01em] text-ink [overflow-wrap:anywhere]">{title}</h2>
-        <p className="max-w-[38ch] text-pretty text-[13px] leading-normal text-ink-2 [overflow-wrap:anywhere]">{body}</p>
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-ink [overflow-wrap:anywhere]">{title}</h2>
+        <p className="max-w-[38ch] text-pretty text-[13px] text-ink-2 [overflow-wrap:anywhere]">{body}</p>
         <div className="mt-2 flex flex-wrap justify-center gap-2">{actions}</div>
       </div>
     </div>

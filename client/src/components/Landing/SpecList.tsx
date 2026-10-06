@@ -19,7 +19,7 @@ export const SpecList: React.FC = () => (
   <section
     className={`${COLUMN} ${INSET} relative z-[1] mt-[104px] grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] items-start gap-x-16 gap-y-10`}
   >
-    <h2 className="text-balance text-[clamp(24px,2.2vw,30px)] font-normal leading-[1.12] tracking-[-0.03em]">
+    <h2 className="text-balance text-[clamp(24px,2.2vw,30px)] leading-[1.12] tracking-[-0.03em]">
       <span className="block text-ink">Quick enough to run every time you ship.</span>
       <span className="block text-ink-4">There’s nothing to install and no account to create.</span>
     </h2>

@@ -46,7 +46,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ active, onShowInGraph })
     setSort((prev) => (prev.field === field ? { field, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { field, dir: 'asc' }));
   }, []);
 
-  if (nodes.size > 0 && rows.length === 0) return <NoMatches className="bg-surface" />;
+  if (nodes.size > 0 && rows.length === 0) return <NoMatches />;
 
   return wide ? (
     <ReportTable rows={rows} sort={sort} onSort={handleSort} onOpen={onShowInGraph} selectedId={selectedId} />

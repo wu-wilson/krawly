@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { FOCUS_RING } from './styles';
+import { FOCUS_RING_INSET } from './styles';
 
 /** One choice in a segmented control */
 interface SegmentOption<T extends string> {
@@ -55,8 +55,8 @@ export const SegmentedControl = <T extends string>({
           type="button"
           aria-pressed={active}
           onClick={() => onChange?.(option.value)}
-          className={`cursor-pointer rounded-[5px] font-medium transition-[color,background-color,box-shadow] duration-200 ease-quart ${SIZES[size]} ${FOCUS_RING}
-            ${active ? 'bg-surface text-ink shadow-segment' : 'bg-transparent text-ink-3 hover:text-ink'}`}
+          className={`rounded-[5px] font-medium transition-[color,background-color,box-shadow] duration-200 ease-quart ${SIZES[size]} ${FOCUS_RING_INSET}
+            ${active ? 'bg-surface text-ink shadow-segment' : 'text-ink-3 hover:text-ink'}`}
         >
           {option.label}
         </button>

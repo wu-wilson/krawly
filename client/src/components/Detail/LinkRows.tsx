@@ -26,7 +26,7 @@ export const LinkRows: React.FC<LinkRowsProps> = ({ ids, scopeHost }) => {
   const selectNode = useCrawlStore((s) => s.selectNode);
 
   return (
-    <ul className="flex flex-col">
+    <ul>
       {ids.map((id, i) => {
         const node = nodes[i];
         const path = displayPath(node?.url ?? id, scopeHost);
@@ -44,7 +44,7 @@ export const LinkRows: React.FC<LinkRowsProps> = ({ ids, scopeHost }) => {
               type="button"
               onClick={() => selectNode(id)}
               title={node.url}
-              className={`flex h-8 cursor-pointer items-center justify-between gap-3 text-left text-[12.5px] text-ink-2 hover:text-ink ${BLEED_ROW}
+              className={`flex h-8 items-center justify-between gap-3 text-[12.5px] text-ink-2 hover:text-ink ${BLEED_ROW}
                 ${HOVER_TRANSITION} ${FOCUS_RING}`}
             >
               <span className="truncate">{path}</span>

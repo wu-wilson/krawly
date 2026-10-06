@@ -22,12 +22,12 @@ Mobile-first. Use Tailwind's default breakpoints: `sm` (640px), `md` (768px), `l
 - **Column:** content sits in a 1200px column with a 24px gutter (`COLUMN` in `components/Landing/layout.ts`). From `sm` up, text is inset 32px (`INSET`) so it lines up with the demo window's edges, and the header logo is nudged `-3px` so its ink, not its viewBox, aligns.
 - **Hero:** the headline is `clamp(32px, 3.2vw, 46px)`. On phones the address field drops its "https://" prefix, keeps the button inside the field, and grows to 56px so the button is a 44px target.
 - **Demo window:** the map canvas is `clamp(340px, 50vw, 604px)` tall. On phones it plays a compact crawl, round and two rings deep, so the square window shows the whole map. The map never draws below the app's fit floor (0.68 scale, `FIT_FLOOR` in `graph/viewMath.ts`); when it can't fit at that size it holds the floor, centred on the start page, and crops the outer rings. On phones the top bar keeps only Share and the filter row keeps All, Broken, and Redirects.
-- **Silk:** it's pinned to the demo window's top-right and bottom-left corners at a fixed size, and fades out about 240px past the window, so ultrawide screens see it dissolve rather than stretch. Below 1132px each half fades out as it nears the window (`.silk-upper` / `.silk-lower` in `index.css`), and below `sm` it's drawn at 60%.
+- **Silk:** it's pinned to the demo window's top-right and bottom-left corners at a fixed size, and fades out about 240px past the window, so ultrawide screens see it dissolve rather than stretch. Below 1132px each half fades out as it nears the window (`.silk-upper` / `.silk-lower` in `index.css`), and below `sm` it's drawn at 60% scale.
 - **Footer:** a 65px bar, the same height as the header. On phones its two lines stack with 18px padding.
 
 ## App Chrome
 
-- **Top bar:** 48px on `sm` and up, with the logo, a divider, the site's host, and a plain status sentence on the left, then the Graph/Report switch and the crawl's actions on the right (Pause and Stop while running, Resume and Stop while paused, Export and Share when done). Below `sm` it's 56px: the mark as a 44px home button, the host over the status sentence, and a 44px "more" menu holding the actions. The outer `<header>` carries `pt-[env(safe-area-inset-top)]` and the inner row the fixed height. On phones a copied share link is confirmed in place of the status sentence. The silk loading line runs along its bottom edge during a crawl.
+- **Top bar:** 48px on `sm` and up, with the logo, a divider, the site's host, and a plain status sentence on the left, then the Graph/Report switch and the crawl's actions on the right (Pause and Stop while running, Resume and Stop while paused, Export and Share when done). Below `sm` it's 56px: the mark as a 44px home button, the host over the status sentence, and a 44px "more" menu holding the actions. The outer `<header>` carries `pt-[env(safe-area-inset-top)]` and the inner row the fixed height. On phones a copied share link is confirmed in place of the status sentence. The silk loading line runs along its bottom edge while a crawl is running.
 - **Filter bar (`sm` and up):** 40px, with the status tabs and their counts, a divider, the type select, and the search field (`/` focuses it while the bar is showing). The tab group scrolls sideways if space runs out; the search narrows below `md`.
 - **Phone controls (below `sm`):** a 52px row with the Graph/Report switch and one native select for the status filter with counts. Phones have no type or search controls, so when a shared link brings those filters, a row below names them with a Clear button.
 - **Limit notice:** a note under the filters once a crawl hits its page limit.
@@ -47,7 +47,7 @@ Mobile-first. Use Tailwind's default breakpoints: `sm` (640px), `md` (768px), `l
 
 ## Touch Screens
 
-Touch screens wider than a phone (tablets, and phones held sideways) keep the desktop chrome but size it for fingers with the `coarse:` variant (`pointer: coarse`, a plugin variant in `tailwind.config.js`, since a non-width screen would switch off the `max-*` variants): labeled controls in the top bar and filter bar grow to 30–32px, and the map's zoom buttons and the details' buttons and path-trail rows use their touch sizes.
+Touch screens wider than a phone (tablets, and phones held sideways) keep the desktop chrome but size it for fingers with the `coarse:` variant (`pointer: coarse`, a plugin variant in `tailwind.config.js`, since a non-width screen would switch off the `max-*` variants): labeled controls in the top bar and filter bar grow to 30–32px, the home button to 36px, and the map's zoom buttons and the details' buttons and path-trail rows use their touch sizes.
 
 ## Global Rules
 

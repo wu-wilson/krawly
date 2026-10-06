@@ -6,6 +6,9 @@ export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 /** Radius of every node, in map units */
 export const NODE_R = 4;
 
+/** Radius of the ring that marks the start page, in map units */
+export const START_RING_R = 9;
+
 /** Animation timings, in ms */
 export const MOTION = {
   /** A link grows from its parent */

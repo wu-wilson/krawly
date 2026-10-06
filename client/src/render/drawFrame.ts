@@ -1,10 +1,10 @@
 import { MAP_COLORS } from './colors';
 import { cutCubic } from './cubic';
+import { START_RING_R } from './motion';
 
 import type { FrameNode, GraphFrame, NodeGlyph, ViewTransform } from './frame';
 
 const ARROW = 5;
-const START_RING_R = 9;
 const PULSE_R = 2.2;
 const PULSE_HALO_R = 5;
 const GRID_SPACING = 22;
@@ -220,6 +220,7 @@ const drawLabels = (ctx: CanvasRenderingContext2D, frame: GraphFrame): void => {
   ctx.lineWidth = frame.labelSize * 0.36;
   for (const label of frame.labels) {
     if (label.alpha <= 0) continue;
+    // Canvas ignores an alpha above 1 and keeps the previous one, so the product is capped.
     ctx.globalAlpha = Math.min(1, frame.alpha * label.alpha);
     ctx.font = `${label.emphasis ? 600 : 500} ${frame.labelSize}px ${LABEL_FONT}`;
     ctx.textAlign = label.anchor === 'end' ? 'right' : 'left';
@@ -230,7 +231,8 @@ const drawLabels = (ctx: CanvasRenderingContext2D, frame: GraphFrame): void => {
   }
 };
 
-// Circle primitives for the glyphs. A ringed node is a white disc with a colored stroke.
+// Circle primitives for the glyphs. A ringed node is a white disc with a colored stroke. Radii are floored at 0, since
+// arc() throws on a negative one.
 const fillCircle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void => {
   ctx.beginPath();
   ctx.arc(x, y, Math.max(0, r), 0, Math.PI * 2);

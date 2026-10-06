@@ -1,6 +1,6 @@
 import React from 'react';
 
-/** Names of the icons in Krawly's 1.5px stroke set */
+/** Names of the icons in Krawly's stroke set, drawn on a 16-unit grid */
 export type IconName =
   | 'arrowRight'
   | 'download'
@@ -25,7 +25,7 @@ interface IconProps {
   /** Which icon to draw */
   name: IconName;
   /** Rendered size in pixels */
-  size?: number;
+  size: number;
   /** Additional classes; the icon draws in `currentColor` */
   className?: string;
 }
@@ -64,7 +64,7 @@ const STROKE: Partial<Record<IconName, number>> = { share: 1.6, external: 1.6, m
  * @param props - Icon name, size, and classes
  * @returns SVG icon hidden from assistive tech
  */
-export const Icon: React.FC<IconProps> = ({ name, size = 12, className = '' }) => (
+export const Icon: React.FC<IconProps> = ({ name, size, className = '' }) => (
   <svg
     width={size}
     height={size}

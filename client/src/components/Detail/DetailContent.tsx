@@ -33,7 +33,7 @@ const COPY_LABELS = { idle: 'Copy URL', copied: 'Copied', failed: 'Couldn’t co
 /**
  * Everything Krawly knows about one page: its status and what it means, where it sits, how to reach it from the
  * start page, what links to it, and the raw response. Everything but the actions scrolls, so a short screen keeps
- * them in reach. The sheet, and any touch screen, gets 44px controls. Memoized, so dragging the sheet doesn't
+ * them in reach. The sheet, and any touch screen, gets 44px buttons and 32px path-trail rows. Memoized, so dragging the sheet doesn't
  * re-render it.
  * @param props - Page, host, layout, and close handler
  * @returns Detail content
@@ -83,7 +83,7 @@ export const DetailContent = React.memo<DetailContentProps>(({ node, scopeHost, 
             </Section>
           )}
 
-          <div className="mt-3.5 flex flex-col">
+          <div className="mt-3.5">
             {node.outbound.length > 0 && (
               <Disclosure title={`Links on this page (${node.outbound.length})`}>
                 <LinkRows ids={node.outbound} scopeHost={scopeHost} />
@@ -106,7 +106,7 @@ export const DetailContent = React.memo<DetailContentProps>(({ node, scopeHost, 
       </div>
 
       <div
-        className={`flex flex-none gap-2 border-t border-line ${sheet ? 'px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3' : 'px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3.5'}`}
+        className={`flex gap-2 border-t border-line ${sheet ? 'px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3' : 'px-5 pb-[calc(14px+env(safe-area-inset-bottom))] pt-3.5'}`}
       >
         <ButtonLink
           href={node.finalUrl ?? node.url}
