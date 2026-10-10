@@ -57,7 +57,7 @@ Source of truth: CSS custom properties in `client/src/index.css`, stored as spac
 
 - The web-cell mark (`components/Brand/KrawlyMark.tsx`), drawn on a 48-unit grid: six spokes from a centre node, an outer ring, and an inner ring, each thread sagging toward the centre.
 - In the UI the mark is stroke 2.3 with a radius-3.2 dot. The inner ring stays at every size so the mark never reads as a cube.
-- Favicon: its own cut of the mark (stroke 3, a radius-3.4 dot, a deeper sag, and a slightly smaller inner ring) in white on a 32px ink tile with 7px corners (`public/favicon.svg`). Redraw it by hand when the mark changes.
+- Favicon: its own cut of the mark (stroke 3, a radius-3.4 dot, a deeper sag, and a slightly smaller inner ring) in white on a 32px ink tile with 7px corners (`public/favicon.svg`). `public/apple-touch-icon.png` is the same cut at 180px on a square tile, since iOS rounds the corners itself. Redraw both by hand when the mark changes.
 
 ## Shadows
 
